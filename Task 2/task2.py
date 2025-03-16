@@ -152,7 +152,7 @@ def compute_R_T_circular(n0, n1, n2, d1, wavelength, phi0):
     R = (np.abs(R_p)**2 + np.abs(R_s)**2) / 2
     T = (np.abs(T_p)**2 + np.abs(T_s)**2) / 2
 
-    correction_factor = (n1 * cos_phi1) / (n0 * cos_phi0)
+    correction_factor = (n2 * cos_phi0) / (n0 * cos_phi0)
 
     A = 1 - R - T*correction_factor
 
@@ -213,8 +213,8 @@ if __name__ == "__main__":
     lambda_um, n0, n1, n2 = refraction_index("Data/n_k_combined.txt")
     phi0 = 0
     d1 = 14e-3
-    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, "Reflectivity, transmissivity, and absorbance for 0° and thickness", save = True)
-    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, 28.7, "Reflectivity, transmissivity, and absorbance for solar noon of incidence and thickness", save= True)
+    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, "Reflectivity, transmissivity, and absorbance for 0° and thickness", save = False)
+    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, 28.7, "Reflectivity, transmissivity, and absorbance for solar noon of incidence and thickness", save= False)
     print("The power ratio is maximized when the thickness of the metal layer is {} µm".format(optimal_thickness_d(n0, n1, n2, lambda_um, phi0)))
 
     R, T, A = compute_R_T_circular(n0, n1, n2, d1, lambda_um, phi0)

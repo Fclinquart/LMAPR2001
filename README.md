@@ -24,8 +24,9 @@
 
 #### remarques : 
 - Erreur T venant du correction factor :
-    -[ ]**A corriger**
+    -[x]**A corriger**
 -  Check si le calcul d'intensité est cohérent 
+    - ne pas le faire avec $I_0$ mais avec le vrai spectre su soleil 
 
 # Module 3 :  ACV 
 
