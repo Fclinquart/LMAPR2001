@@ -171,6 +171,10 @@ def plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, Tilte = "", sav
     plt.plot(lambda_um, A, label = "Absorbance")
     plt.xlabel("Wavelength (µm)")
     plt.xscale('log')
+    plt.axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
+    plt.axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
+    plt.axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
+    plt.ylabel("R, T, A")
     plt.legend()
     if Tilte != "":
         plt.title(Tilte)
@@ -179,25 +183,49 @@ def plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, Tilte = "", sav
     else : 
         plt.show()
 
-
-def power_spectrum(lambda_um, lambda_min, lambda_max,T, I0 = 1000):
+def power_spectrum(lambda_um, lambda_min, lambda_max,T, I0=1000):
     mask = (lambda_um >= lambda_min) & (lambda_um <= lambda_max)
+    
     integrand = np.real(T[mask]) * I0 * lambda_um[mask]
+    
     return np.trapz(integrand, lambda_um[mask])
 
+def power_spectrum_solar(lambda_um, lambda_min, lambda_max, I, T):
+    # Convert I from W/nm·m² to W/µm·m² (since lambda_um is in µm)
+    I = I  # 1 nm = 1e-3 µm
+
+    # Filter the data to include only the wavelengths within [lambda_min, lambda_max]
+    mask = (lambda_um >= lambda_min) & (lambda_um <= lambda_max)
+    lambda_filtered = lambda_um[mask]
+    I_filtered = I[mask]
+    T_filtered = T[mask]
+
+    # Compute the integrand: T * I * lambda
+    integrand = np.real(T_filtered) * I_filtered * lambda_filtered
+
+    # Perform the integration using np.trapz
+    power = np.trapz(integrand, lambda_filtered)
+
+    return power
+  
 def power_ratio(lambda_um, lambda_min, lambda_max, T, I0 = 1000):
     power_spec = power_spectrum(lambda_um, lambda_min, lambda_max, T, I0)
     integrand = np.real(T) * I0 * lambda_um
     total_power = np.trapz(integrand, lambda_um)
-    return power_spec / total_power
-    
+    return np.real(power_spec / total_power)
 
-def optimal_thickness_d(n0, n1, n2, lambda_um, phi0, I0 = 1000, plot = False):
+def power_ratio_solar(lambda_um, lambda_min, lambda_max, I, T):
+    power_spec = power_spectrum_solar(lambda_um, lambda_min, lambda_max, I, T)
+    integrand = np.real(T) * I * lambda_um
+    total_power = np.trapz(integrand, lambda_um)
+    return np.real(power_spec / total_power)
+
+def optimal_thickness_d(n0, n1, n2, lambda_um, phi0, I, plot = False):
     d_values = np.linspace(0, 100e-3, 1000)
     power_ratios = []
     for d in d_values:
         R, T, A = compute_R_T_circular(n0, n1, n2, d, lambda_um, phi0)
-        power_ratios.append(power_ratio(lambda_um, 0.4, 0.8, T, I0))
+        power_ratios.append(power_ratio_solar(lambda_um, 0.4, 0.8, T, I))
 
     if plot:
         plt.plot(d_values, power_ratios)
@@ -207,19 +235,32 @@ def optimal_thickness_d(n0, n1, n2, lambda_um, phi0, I0 = 1000, plot = False):
 
     return d_values[np.argmax(power_ratios)]
 
+def Solar_spectrum(filename):
+    data = pd.read_csv(filename, delim_whitespace=True, skiprows=1, header=None)
 
+    I = data[5].values
+    return I
 
 if __name__ == "__main__":
-    lambda_um, n0, n1, n2 = refraction_index("Data/n_k_combined.txt")
+    lambda_um, n0, n1, n2 = refraction_index("Data/n_k_combined_Sun.txt")
     phi0 = 0
     d1 = 14e-3
     plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, "Reflectivity, transmissivity, and absorbance for 0° and thickness", save = False)
     plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, 28.7, "Reflectivity, transmissivity, and absorbance for solar noon of incidence and thickness", save= False)
-    print("The power ratio is maximized when the thickness of the metal layer is {} µm".format(optimal_thickness_d(n0, n1, n2, lambda_um, phi0)))
-
+    print("The power ratio is maximized when the thickness of the metal layer is {} µm".format(optimal_thickness_d(n0, n1, n2, lambda_um, phi0, I, plot = False)*1e3))
+    I = Solar_spectrum("Data/n_k_combined_Sun.txt")
+  
     R, T, A = compute_R_T_circular(n0, n1, n2, d1, lambda_um, phi0)
+
+    print("The power intensity of the solar spectrum is : ", power_spectrum_solar(lambda_um, 0.2, 20, I, T))
+
+
     print("The power intensity of UV, visible, and IR light :")
-    print("UV light : ", power_ratio(lambda_um, 0.2, 0.4, T))
-    print("Visible light : ", power_ratio(lambda_um, 0.4, 0.8, T))
-    print("IR light : ", power_ratio(lambda_um, 0.8, 20, T))
-    print("Task 3 : Done!")
+    
+    print("The power ratio of the solar spectrum is : ", power_ratio_solar(lambda_um, 0.2, 20, I, T))
+    print("The power ratio of the solar spectrum is : ", power_ratio(lambda_um, 0.2, 20, I, T))
+    print("The power ratio of the UV light is : ", power_ratio_solar(lambda_um, 0.2, 0.4, I, T))
+    print("The power ratio of the visible light is : ", power_ratio_solar(lambda_um, 0.4, 0.8, I, T))
+    print("The power ratio of the IR light is : ", power_ratio_solar(lambda_um, 0.8, 20, I, T))
+
+

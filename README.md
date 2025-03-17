@@ -14,7 +14,7 @@
 
 ### Clôturer la task 2
 
-- [ ] Vérifier si T est bon
+- [x] Vérifier si T est bon
 - [x] Calculer la Puissance du Rayonnement solaire $1 \frac{W}{m²}$
 - [x] Calculer le produit $F_{transmitted}$ et $F_{reflected}$ et l'optimiser pour trouver d
 - [ ] Plotter $F_{transmitted}$ et $F_{reflected}$ en fonction de d + Discussion
@@ -26,7 +26,7 @@
 - Erreur T venant du correction factor :
     -[x]**A corriger**
 -  Check si le calcul d'intensité est cohérent 
-    - ne pas le faire avec $I_0$ mais avec le vrai spectre su soleil 
+    - ne pas le faire avec $I_0$ mais avec le vrai spectre su soleil *Fait*
 
 # Module 3 :  ACV 
 
