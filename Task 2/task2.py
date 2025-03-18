@@ -11,11 +11,10 @@ def refraction_index(filename):
     kappa_glass = data[2].values # Extinction coefficient of glass
     n_silver = data[3].values # Refractive index of silver
     kappa_silver = data[4].values # Extinction coefficient
-
     n0 = 1 
     n1 = n_silver - 1j * kappa_silver
     n2 = n_glass - 1j * kappa_glass
-
+    plot_n_k(lambda_um, n_silver, kappa_silver)
 
     return lambda_um, n0, n1, n2
 
@@ -152,7 +151,7 @@ def compute_R_T_circular(n0, n1, n2, d1, wavelength, phi0):
     R = (np.abs(R_p)**2 + np.abs(R_s)**2) / 2
     T = (np.abs(T_p)**2 + np.abs(T_s)**2) / 2
 
-    correction_factor = (n2 * cos_phi0) / (n0 * cos_phi0)
+    correction_factor = (n2 * cos_phi2) / (n0 * cos_phi0)
 
     A = 1 - R - T*correction_factor
 
@@ -216,8 +215,9 @@ def power_ratio(lambda_um, lambda_min, lambda_max, T, I0 = 1000):
 
 def power_ratio_solar(lambda_um, lambda_min, lambda_max, I, T):
     power_spec = power_spectrum_solar(lambda_um, lambda_min, lambda_max, I, T)
-    integrand = np.real(T) * I * lambda_um
+    integrand =  I * lambda_um * np.real(T)
     total_power = np.trapz(integrand, lambda_um)
+    print("total power", total_power)
     return np.real(power_spec / total_power)
 
 def optimal_thickness_d(n0, n1, n2, lambda_um, phi0, I, plot = False):
@@ -237,30 +237,50 @@ def optimal_thickness_d(n0, n1, n2, lambda_um, phi0, I, plot = False):
 
 def Solar_spectrum(filename):
     data = pd.read_csv(filename, delim_whitespace=True, skiprows=1, header=None)
-
-    I = data[5].values
+    # https://www.pveducation.org/pvcdrom/appendices/standard-solar-spectra 
+    I = data[5].values * 1e3 
     return I
 
+def plot_n_k(lambda_um, n, k):
+    plt.figure(figsize=(10, 6))
+    plt.plot(lambda_um, n, label="Refractive index")
+    plt.plot(lambda_um, k, label="Extinction coefficient")
+    plt.xlabel("Wavelength (µm)")
+    plt.ylabel("n, k")
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.legend()
+    plt.show()
 if __name__ == "__main__":
     lambda_um, n0, n1, n2 = refraction_index("Data/n_k_combined_Sun.txt")
+    
     phi0 = 0
     d1 = 14e-3
     plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, "Reflectivity, transmissivity, and absorbance for 0° and thickness", save = False)
     plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, 28.7, "Reflectivity, transmissivity, and absorbance for solar noon of incidence and thickness", save= False)
-    print("The power ratio is maximized when the thickness of the metal layer is {} µm".format(optimal_thickness_d(n0, n1, n2, lambda_um, phi0, I, plot = False)*1e3))
     I = Solar_spectrum("Data/n_k_combined_Sun.txt")
+    print("The power ratio is maximized when the thickness of the metal layer is {} µm".format(optimal_thickness_d(n0, n1, n2, lambda_um, phi0, I, plot = False)*1e3))
   
     R, T, A = compute_R_T_circular(n0, n1, n2, d1, lambda_um, phi0)
 
     print("The power intensity of the solar spectrum is : ", power_spectrum_solar(lambda_um, 0.2, 20, I, T))
-
-
     print("The power intensity of UV, visible, and IR light :")
-    
     print("The power ratio of the solar spectrum is : ", power_ratio_solar(lambda_um, 0.2, 20, I, T))
     print("The power ratio of the solar spectrum is : ", power_ratio(lambda_um, 0.2, 20, I, T))
     print("The power ratio of the UV light is : ", power_ratio_solar(lambda_um, 0.2, 0.4, I, T))
     print("The power ratio of the visible light is : ", power_ratio_solar(lambda_um, 0.4, 0.8, I, T))
     print("The power ratio of the IR light is : ", power_ratio_solar(lambda_um, 0.8, 20, I, T))
+
+    # plot the solar spectrum
+    plt.figure(figsize=(10, 6))
+    plt.plot(lambda_um, I)
+    plt.xlabel("Wavelength (µm)")
+    plt.ylabel("Power intensity (W/nm·m²)")
+    plt.axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
+    plt.axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
+    plt.axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
+    plt.legend()
+    plt.xscale('log')
+    plt.show()
 
 
