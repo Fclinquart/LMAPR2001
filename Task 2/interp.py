@@ -46,10 +46,22 @@ def process_n_k_files(glass_file, silver_file, sun_file,  output_file):
     glass_data.to_csv(output_file, sep=' ', index=False, header=True)
     print(f"Fichier sauvegardé sous {output_file}")
 
-        
+def process_solar_spectra(sun_file, output_file):
+    sun_data = pd.read_excel(sun_file, usecols=[0, 2], names=["lambda_nm", "I"], skiprows=1, dtype={"lambda_nm": float, "I": float})
+    sun_data = sun_data.astype(float)
+    # write to in the output file, the output file is a txt file with two columns
+    sun_data.to_csv(output_file, sep=' ', index=False, header=True)
+    print(f"Fichier sauvegardé sous {output_file}")
+
+
+
+
 
 path_glass = "Data/n_k_glass.txt"
-path_silver = "Data/n_k_gold.txt"
-path_sun = "Data/Standard_Spectra.txt"
+path_silver = "Data/n_k_ag2.txt"
+path_csv_sun = "Data/AM0AM1_5.xls"
+path_sun = "Data/ASTM1.5Global.txt"
 
-process_n_k_files(path_glass, path_silver, path_sun, "Data/n_k_combined_Sun.txt")
+
+process_solar_spectra(path_csv_sun, path_sun)
+process_n_k_files(path_glass, path_silver, path_sun, "Data/n_k_combined.txt")

@@ -24,7 +24,7 @@ def n_k(filename):
     k = data[2].values # Extinction coefficient of glass
     return lambda_um, n, k
 
-def snells_law(n0, n1, phi0):
+def snells(n0, n1, phi0):
     """
     Calculate the angle of refraction using Snell's law.
     
@@ -86,7 +86,7 @@ def reflectivity_semi_infinite_layer(n0, n1, phi0):
     print("Task 1 : Calculating reflectivity for semi-infinite layer...")
 
     phi0 = np.radians(phi0)
-    phi1 = snells_law(n0, n1, phi0)
+    phi1 = snells(n0, n1, phi0)
     
     # Calculate the reflection coefficients for s- and p-polarized light
     r_s = (n0 * np.cos(phi0) - n1 * np.cos(phi1)) / (n0 * np.cos(phi0) + n1 * np.cos(phi1))
@@ -247,6 +247,15 @@ def Solar_spectrum(filename):
     I = data[5].values * 1e3 
     return I
 
+def plot_solar_spectrum(lambda_um, I):
+    plt.figure(figsize=(10, 6))
+    plt.plot(lambda_um, I, label="AM1.5 Global Spectrum ASTM G-173", color = "orange")
+    plt.xlabel("Wavelength (µm)", fontsize=14)
+    plt.ylabel("Intensity (W/m²/µm)", fontsize=14)
+    plt.xlim(0.2, 3)
+    plt.legend()
+    plt.show()
+
 def plot_n_k(lambda_um, n, k):
     plt.figure(figsize=(10, 6))
     plt.plot(lambda_um, n, label="Refractive index")
@@ -257,37 +266,128 @@ def plot_n_k(lambda_um, n, k):
     plt.yscale('log')
     plt.legend()
     plt.show()
+
+def spectral_RTA(spectrum: str, lambda_um, n0, n1, n2, d_list : list, phi0, Irradiance):
+    R_l, T_l, A_l = [], [], []
+    if spectrum == 'UV':
+        mask = (lambda_um >= 0.2) & (lambda_um <= 0.38)
+    elif spectrum == 'Visible':
+        mask = (lambda_um >= 0.38) & (lambda_um <= 0.8)
+    elif spectrum == 'IR':
+        mask = (lambda_um >= 0.8) & (lambda_um <= 20)
+    else:
+        print("Invalid spectrum")
+
+    for d in d_list:
+        R_tot, T_tot, A_tot = 0, 0, 0
+        for i, wl in enumerate(lambda_um):
+            R, T, A = compute_R_T_circular(n0, n1[i], n2[i], d, wl, phi0)
+            if mask[i]:
+                R_tot += R * Irradiance[i]
+                T_tot += np.real(T) * Irradiance[i]
+                A_tot += np.real(A) * Irradiance[i]
+        I = np.sum(Irradiance[mask])
+        R_l.append(R_tot / I *100)
+        T_l.append(T_tot / I *100)
+        A_l.append(A_tot / I *100)
+
+    return R_l, T_l, A_l
+
+def plot_I_vs_d( lambda_um, n0, n1, n2, d_list, phi0, Irradiance):
+
+    # UV spectrum
+    R_UV, T_UV, A_UV = spectral_RTA('UV', lambda_um, n0, n1, n2, d_list, phi0, Irradiance)
+    plt.figure(figsize=(10, 6))
+    plt.plot(d_list, R_UV, label="Reflectivity (UV Spectrum)")
+    plt.plot(d_list, T_UV, label="Transmissivity (UV Spectrum)")
+    plt.plot(d_list, A_UV, label="Absorbance (UV Spectrum)")
+    plt.xlabel("Thickness (µm)")
+    plt.xscale('log')
+    plt.ylabel("R, T, A (%)")
+    plt.legend()
+    plt.savefig("Output/Fraction_of_spectra_vs_thickness/UV.png")
+
+    # Visible spectrum
+    R_Visible, T_Visible, A_Visible = spectral_RTA('Visible', lambda_um, n0, n1, n2, d_list, phi0, Irradiance)
+    plt.figure(figsize=(10, 6))
+    plt.plot(d_list, R_Visible, label="Reflectivity (Visible Spectrum)")
+    plt.plot(d_list, T_Visible, label="Transmissivity (Visible Spectrum)")
+    plt.plot(d_list, A_Visible, label="Absorbance (Visible Spectrum)")
+    plt.xlabel("Thickness (µm)")
+    plt.xscale('log')
+    plt.ylabel("R, T, A (%)")
+    plt.legend()
+    plt.savefig("Output/Fraction_of_spectra_vs_thickness/Visible.png")
+
+    # IR spectrum
+    R_IR, T_IR, A_IR = spectral_RTA('IR', lambda_um, n0, n1, n2, d_list, phi0, Irradiance)
+    plt.figure(figsize=(10, 6))
+    plt.plot(d_list, R_IR, label="Reflectivity (IR Spectrum)")
+    plt.plot(d_list, T_IR, label="Transmissivity (IR Spectrum)")
+    plt.plot(d_list, A_IR, label="Absorbance (IR Spectrum)")
+    plt.xlabel("Thickness (µm)")
+    plt.xscale('log')
+    plt.ylabel("R, T, A (%)")
+    plt.legend()
+    plt.savefig("Output/Fraction_of_spectra_vs_thickness/IR.png")
+
+def plot_R_T_A_vs_d(lambda_um, n0, n1, n2, d_list, phi0):
+    fig, axs = plt.subplots(3, 1, figsize=(10, 18), sharex=True)
+
+    for d in d_list:
+        R, _, _ = compute_R_T_circular(n0, n1, n2, d, lambda_um, phi0)
+        axs[0].plot(lambda_um, R, label=f"d = {d * 1e3:.2f} nm")
+    axs[0].set_ylabel("Reflectivity")
+    axs[0].set_xscale('log')
+    axs[0].legend()
+    axs[0].axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
+    axs[0].axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
+    axs[0].axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
+    
+
+    for d in d_list:
+        _, T, _ = compute_R_T_circular(n0, n1, n2, d, lambda_um, phi0)
+        axs[1].plot(lambda_um, T, label=f"d = {d * 1e3:.2f} nm")
+    axs[1].set_ylabel("Transmissivity")
+    axs[1].set_xscale('log')
+    axs[1].legend()
+    axs[1].axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
+    axs[1].axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
+    axs[1].axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
+   
+
+    for d in d_list:
+        _, _, A = compute_R_T_circular(n0, n1, n2, d, lambda_um, phi0)
+        axs[2].plot(lambda_um, A, label=f"d = {d * 1e3:.2f} nm")
+    axs[2].set_xlabel("Wavelength (µm)")
+    axs[2].set_ylabel("Absorbance")
+    axs[2].set_xscale('log')
+    axs[2].legend()
+    axs[2].axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
+    axs[2].axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
+    axs[2].axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
+   
+
+    plt.tight_layout()
+    plt.savefig("Output/RTA_vs_d/RTA_combined_{}.png".format(phi0))
+
+
     
 if __name__ == "__main__":
-    lambda_um, n0, n1, n2 = refraction_index("Data/n_k_combined_Sun.txt")
+    print ("Task 2 :")
+    filename = "Data/n_k_combined.txt"
+
+    lambda_um, n0, n1, n2 = refraction_index(filename)
+    Irradiance = Solar_spectrum(filename)
+
+    d_list = np.logspace(-3, 3, 1000)
+    d_val = [0, 1e-3, 10e-3, 100e-3, 1000e-3]
+
+    plot_R_T_A_vs_d(lambda_um, n0, n1, n2, d_val, 0)
+
+
     
-    phi0 = 0
-    d1 = 14e-3
-    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, "Reflectivity, transmissivity, and absorbance for 0° and thickness", save = False)
-    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, 28.7, "Reflectivity, transmissivity, and absorbance for solar noon of incidence and thickness", save= False)
-    I = Solar_spectrum("Data/n_k_combined_Sun.txt")
-    print("The power ratio is maximized when the thickness of the metal layer is {} µm".format(optimal_thickness_d(n0, n1, n2, lambda_um, phi0, I, plot = False)*1e3))
-  
-    R, T, A = compute_R_T_circular(n0, n1, n2, d1, lambda_um, phi0)
 
-    print("The power intensity of the solar spectrum is : ", power_spectrum_solar(lambda_um, 0.2, 20, I, T))
-    print("The power intensity of UV, visible, and IR light :")
-    print("The power ratio of the solar spectrum is : ", power_ratio_solar(lambda_um, 0.2, 20, I, T))
-    print("The power ratio of the solar spectrum is : ", power_ratio(lambda_um, 0.2, 20, I, T))
-    print("The power ratio of the UV light is : ", power_ratio_solar(lambda_um, 0.2, 0.4, I, T))
-    print("The power ratio of the visible light is : ", power_ratio_solar(lambda_um, 0.4, 0.8, I, T))
-    print("The power ratio of the IR light is : ", power_ratio_solar(lambda_um, 0.8, 20, I, T))
-
-    # plot the solar spectrum
-    plt.figure(figsize=(10, 6))
-    plt.plot(lambda_um, I)
-    plt.xlabel("Wavelength (µm)")
-    plt.ylabel("Power intensity (W/nm·m²)")
-    plt.axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
-    plt.axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
-    plt.axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
-    plt.legend()
-    plt.xscale('log')
-    plt.show()
+    
 
 
