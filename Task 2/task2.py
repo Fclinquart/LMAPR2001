@@ -14,9 +14,15 @@ def refraction_index(filename):
     n0 = 1 
     n1 = n_silver - 1j * kappa_silver
     n2 = n_glass - 1j * kappa_glass
-    plot_n_k(lambda_um, n_silver, kappa_silver)
 
     return lambda_um, n0, n1, n2
+
+def n_k(filename):
+    data = pd.read_csv(filename, delim_whitespace=True, skiprows=1, header=None)
+    lambda_um = data[0].values # Wavelengths in micrometers
+    n = data[1].values # Refractive index of glass
+    k = data[2].values # Extinction coefficient of glass
+    return lambda_um, n, k
 
 def snells_law(n0, n1, phi0):
     """
@@ -251,6 +257,7 @@ def plot_n_k(lambda_um, n, k):
     plt.yscale('log')
     plt.legend()
     plt.show()
+    
 if __name__ == "__main__":
     lambda_um, n0, n1, n2 = refraction_index("Data/n_k_combined_Sun.txt")
     
