@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+
 def refraction_index(filename):
     data = pd.read_csv("Data/n_k_combined.txt", delim_whitespace=True, skiprows=1, header=None)
     lambda_um = data[0].values # Wavelengths in micrometers
@@ -256,176 +257,37 @@ def plot_n_k(lambda_um, n, k):
     plt.yscale('log')
     plt.legend()
     plt.show()
-
-def compute_spectral_RTA(lambda_um, n0, n1, n2, d_metal_values, I):
-    """
-    Compute reflectivity (R), transmissivity (T), and absorbance (A) for visible, UV, and IR spectra.
     
-    Parameters:
-        lambda_um (array): Wavelengths in micrometers.
-        n0, n1, n2 (complex): Refractive indices of air, metal, and substrate.
-        d_metal_values (array): Thickness values of the metal layer (in µm).
-        I (array): Solar irradiance data (in W/nm·m²).
-    
-    Returns:
-        d_metal_values (array): Thickness values of the metal layer.
-        R_visible, T_visible, A_visible (arrays): Reflectivity, transmissivity, and absorbance for visible light.
-        R_UV, T_UV, A_UV (arrays): Reflectivity, transmissivity, and absorbance for UV light.
-        R_IR, T_IR, A_IR (arrays): Reflectivity, transmissivity, and absorbance for IR light.
-    """
-    R_visible, T_visible, A_visible = [], [], []
-    R_UV, T_UV, A_UV = [], [], []
-    R_IR, T_IR, A_IR = [], [], []
-    
-    # Define wavelength masks
-    visible_mask = (lambda_um >= 0.38) & (lambda_um <= 0.75)
-    uv_mask = (lambda_um < 0.38)
-    ir_mask = (lambda_um > 0.75)
-    
-    for d_metal in d_metal_values:
-        R_total_vis, T_total_vis, A_total_vis = 0, 0, 0
-        R_total_UV, T_total_UV, A_total_UV = 0, 0, 0
-        R_total_IR, T_total_IR, A_total_IR = 0, 0, 0
-        
-        for i, lambda_val in enumerate(lambda_um):
-            R, T, A = compute_R_T_circular(n0, n1, n2, d_metal, lambda_val, 0)  # Angle of incidence = 0°
-            
-            if visible_mask[i]:
-                R_total_vis += R * I[i]
-                T_total_vis += T * I[i]
-                A_total_vis += A * I[i]
-            elif uv_mask[i]:
-                R_total_UV += R * I[i]
-                T_total_UV += T * I[i]
-                A_total_UV += A * I[i]
-            elif ir_mask[i]:
-                R_total_IR += R * I[i]
-                T_total_IR += T * I[i]
-                A_total_IR += A * I[i]
-        
-        # Normalize by the total irradiance in each range
-        I_visible = np.sum(I[visible_mask])
-        I_UV = np.sum(I[uv_mask])
-        I_IR = np.sum(I[ir_mask])
-        
-        R_visible.append(R_total_vis / I_visible * 100) # Convert to percentage
-        T_visible.append(T_total_vis / I_visible * 100) # Convert to percentage
-        A_visible.append(A_total_vis / I_visible * 100) # Convert to percentage
-        
-        R_UV.append(R_total_UV / I_UV * 100)
-        T_UV.append(T_total_UV / I_UV * 100)
-        A_UV.append(A_total_UV / I_UV * 100)
-        
-        R_IR.append(R_total_IR / I_IR * 100)
-        T_IR.append(T_total_IR / I_IR * 100)
-        A_IR.append(A_total_IR / I_IR * 100)
-
-    
-
-
-    
-    return  R_visible, T_visible, A_visible, R_UV, T_UV, A_UV, R_IR, T_IR, A_IR
-
-def plot_percentage_vs_thickness(d_metal_values, R_vis, T_vis, A_vis,  R_UV, T_UV, A_UV, R_IR, T_IR, A_IR, metal_name="metal"):
-    """
-    Plot reflectivity, transmissivity, and absorbance as a function of metal thickness.
-    
-    Parameters:
-        d_metal_values (array): Thickness values of the metal layer.
-        R_vis, T_vis, A_vis (arrays): Reflectivity, transmissivity, and absorbance for visible light.
-        R_UV, T_UV, A_UV (arrays): Reflectivity, transmissivity, and absorbance for UV light.
-        R_IR, T_IR, A_IR (arrays): Reflectivity, transmissivity, and absorbance for IR light.
-        metal_name (str): Name of the metal (e.g., "silver").
-    """
-    # Plot for visible light
-    plt.figure(figsize=(10, 5))
-    plt.plot(d_metal_values, R_vis, 'r-', label='Reflected (Visible)')
-    plt.plot(d_metal_values, T_vis, 'g-', label='Transmitted (Visible)')
-    plt.plot(d_metal_values, A_vis, 'b-', label='Absorbed (Visible)')
-    
-    plt.xscale('log')
-    plt.xlabel("Metal film thickness (µm)")
-    plt.ylabel("Percentage (%)")
-    plt.title(f"Effect of {metal_name} thickness on RTA Properties (Visible light)")
-    plt.legend(loc='upper right')
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.show()
-    
-    # Plot for UV and IR light
-    plt.figure(figsize=(10, 5))
-    plt.plot(d_metal_values, R_UV, 'r--', label='Reflected (UV)')
-    plt.plot(d_metal_values, T_UV, 'g--', label='Transmitted (UV)')
-    plt.plot(d_metal_values, A_UV, 'b--', label='Absorbed (UV)')
-    
-    plt.plot(d_metal_values, R_IR, 'r-.', label='Reflected (IR)')
-    plt.plot(d_metal_values, T_IR, 'g-.', label='Transmitted (IR)')
-    plt.plot(d_metal_values, A_IR, 'b-.', label='Absorbed (IR)')
-    
-    plt.xscale('log')
-    plt.xlabel("Metal film thickness (µm)")
-    plt.ylabel("Percentage (%)")
-    plt.title(f"Effect of {metal_name} thickness on RTA properties (UV & IR)")
-    plt.legend(loc='upper right')
-    plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-    plt.show()
-
-def theoretical_optimal_thickness(T_percentages_visible, R_percentages_UV, R_percentages_IR, d_metal_values, T_threshold, angle_incidence=0, metal_name="metal"):
-    """
-    Calculate the optimal metal film thickness based on a desired visible light transmissivity (T) threshold.
-    
-    Parameters:
-        T_percentages_visible (list): Transmission percentages for visible light.
-        R_percentages_UV (list): Reflection percentages for UV light.
-        R_percentages_IR (list): Reflection percentages for IR light.
-        d_metal_values (list): Thickness values of the metal layer.
-        T_threshold (float): Desired transmissivity threshold (%) for visible light.
-        angle_incidence (float): Angle of incidence of light (in degrees).
-        metal_name (str): Name of the metal (e.g., "silver").
-    
-    Returns:
-        optimal_thickness_visible (float): Optimal thickness for visible light.
-        R_UV_at_optimal (float): Reflectivity for UV at the optimal thickness.
-        R_IR_at_optimal (float): Reflectivity for IR at the optimal thickness.
-    """
-    # Find the minimum thickness that achieves the desired visible light transmissivity threshold
-    optimal_thickness_visible = None
-    for i, T_visible in enumerate(T_percentages_visible):
-        if T_visible >= T_threshold:
-            optimal_thickness_visible = d_metal_values[i]
-            break
-    
-    if optimal_thickness_visible is None:
-        print(f"No thickness achieves the transmissivity threshold of {T_threshold}% for visible light.")
-        return None, None, None
-    
-    # Use the optimal thickness for visible light to calculate the RTA contributions in UV and IR
-    idx_optimal = np.where(d_metal_values == optimal_thickness_visible)[0][0]
-    R_UV_at_optimal = R_percentages_UV[idx_optimal]
-    R_IR_at_optimal = R_percentages_IR[idx_optimal]
-    T_visible_at_optimal = T_percentages_visible[idx_optimal]
-    
-    # Display the results
-    print(f"For {metal_name} (Angle of incidence = {angle_incidence}°):")
-    print(f"- Optimal thickness to achieve {T_threshold}% transmissivity in visible light: {optimal_thickness_visible:.2f} µm")
-    print(f"- UV reflectivity at this thickness: {R_UV_at_optimal:.2f}%")
-    print(f"- IR reflectivity at this thickness: {R_IR_at_optimal:.2f}%")
-    
-    return optimal_thickness_visible, R_UV_at_optimal, R_IR_at_optimal
-
 if __name__ == "__main__":
     lambda_um, n0, n1, n2 = refraction_index("Data/n_k_combined_Sun.txt")
+    
+    phi0 = 0
+    d1 = 14e-3
+    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, "Reflectivity, transmissivity, and absorbance for 0° and thickness", save = False)
+    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, 28.7, "Reflectivity, transmissivity, and absorbance for solar noon of incidence and thickness", save= False)
     I = Solar_spectrum("Data/n_k_combined_Sun.txt")
-    
-    # Define thickness values to test
-    d_metal_values = [10e-3, 100e-3]
-    
-    # Compute RTA for different thicknesses
-    R_vis, T_vis, A_vis, R_UV, T_UV, A_UV, R_IR, T_IR, A_IR = compute_spectral_RTA(lambda_um, n0, n1, n2, d_metal_values, I)
-
-    
-
-    
-    # Plot RTA vs thickness
-    plot_percentage_vs_thickness(d_metal_values, R_vis, T_vis, A_vis, R_UV, T_UV, A_UV, R_IR, T_IR, A_IR, metal_name="silver")
-    
+    print("The power ratio is maximized when the thickness of the metal layer is {} µm".format(optimal_thickness_d(n0, n1, n2, lambda_um, phi0, I, plot = False)*1e3))
   
+    R, T, A = compute_R_T_circular(n0, n1, n2, d1, lambda_um, phi0)
+
+    print("The power intensity of the solar spectrum is : ", power_spectrum_solar(lambda_um, 0.2, 20, I, T))
+    print("The power intensity of UV, visible, and IR light :")
+    print("The power ratio of the solar spectrum is : ", power_ratio_solar(lambda_um, 0.2, 20, I, T))
+    print("The power ratio of the solar spectrum is : ", power_ratio(lambda_um, 0.2, 20, I, T))
+    print("The power ratio of the UV light is : ", power_ratio_solar(lambda_um, 0.2, 0.4, I, T))
+    print("The power ratio of the visible light is : ", power_ratio_solar(lambda_um, 0.4, 0.8, I, T))
+    print("The power ratio of the IR light is : ", power_ratio_solar(lambda_um, 0.8, 20, I, T))
+
+    # plot the solar spectrum
+    plt.figure(figsize=(10, 6))
+    plt.plot(lambda_um, I)
+    plt.xlabel("Wavelength (µm)")
+    plt.ylabel("Power intensity (W/nm·m²)")
+    plt.axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
+    plt.axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
+    plt.axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
+    plt.legend()
+    plt.xscale('log')
+    plt.show()
+
+
