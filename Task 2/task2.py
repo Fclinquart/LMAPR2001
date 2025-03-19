@@ -555,7 +555,148 @@ def Optimal_thickness(d_list, lambda_um, n0, n1, n2, phi0, Irradiance):
     for i, d in enumerate(d_list):
         d_opt.append(R_IR[i] * T_Vis[i])
     return d_list[np.argmax(d_opt)]
+
+def ellipsometry_theoretical(n0, n1, n2, phi0, d1, wavelength):
+    """
+    Calculate the reflectance and transmittance for a thin film using ellipsometry.
+
+    Parameters:
+    n0 (float): Refractive index of the first medium.
+    n1 (float): Refractive index of the second medium.
+    n2 (float): Refractive index of the third medium.
+    phi0 (float): Angle of incidence in degrees.
+    d1 (float): Thickness of the thin film in micrometers.
+    wavelength (float): Wavelength of light in micrometers.
+
+    Returns:
+    tuple: A tuple containing:
+        - R (float): Reflectance.
+        - T (float): Transmittance.
+    """
+    print("Task 2 : Calculating")
+    phi0 = np.radians(phi0)
     
+    sin_phi0 = np.sin(phi0)
+    sin_phi1 = (n0 / n1) * sin_phi0
+    phi1 = np.arcsin(sin_phi1)
+    sin_phi2 = (n1 / n2) * np.sin(phi1)
+    phi2 = np.arcsin(sin_phi2)
+
+    # Compute cosines of angles
+    cos_phi0 = np.cos(phi0)
+    cos_phi1 = np.cos(phi1)
+    cos_phi2 = np.cos(phi2)
+
+    # Fresnel coefficients for p-polarization (equations 4.41-4.46)
+    r01p = (n1 * cos_phi0 - n0 * cos_phi1) / (n1 * cos_phi0 + n0 * cos_phi1)
+    r12p = (n2 * cos_phi1 - n1 * cos_phi2) / (n2 * cos_phi1 + n1 * cos_phi2)
+
+    # Fresnel coefficients for s-polarization (equations 4.43-4.48)
+    r01s = (n0 * cos_phi0 - n1 * cos_phi1) / (n0 * cos_phi0 + n1 * cos_phi1)
+    r12s = (n1 * cos_phi1 - n2 * cos_phi2) / (n1 * cos_phi1 + n2 * cos_phi2)
+
+    t01s = (2 * n0 * cos_phi0) / (n0 * cos_phi0 + n1 * cos_phi1)
+    t12s = (2 * n1 * cos_phi1) / (n1 * cos_phi2 + n2 * cos_phi1)
+
+    # Phase thickness beta (equation 4.32 corrected)
+
+    beta = 2 * np.pi * d1 * n1 * cos_phi1 / wavelength
+
+    # Reflection coefficients (equations 4.37-4.38)
+    R_p = (r01p + r12p * np.exp(-2j * beta)) / (1 + r01p * r12p * np.exp(-2j * beta))
+    R_s = (r01s + r12s * np.exp(-2j * beta)) / (1 + r01s * r12s * np.exp(-2j * beta))
+
+    rho = R_p/R_s
+    psi = np.arctan(np.abs(rho))
+    delta = np.angle(rho)
+
+    return np.degrees(psi), np.degrees(delta)
+
+def plot_ellipsometry_theoretical(n0, n1, n2, phi0, d1, lambda_um, metalname="Silver"):
+    """
+    Plot the ellipsometry parameters (psi and delta) versus wavelength.
+
+    Parameters:
+    n0 (float): Refractive index of the first medium.
+    n1 (float): Refractive index of the second medium.
+    n2 (float): Refractive index of the third medium.
+    phi0 (float): Angle of incidence in degrees.
+    d1 (float): Thickness of the thin film in micrometers.
+    lambda_um (numpy.ndarray): Wavelengths in micrometers.
+    """
+    psi, delta = ellipsometry_theoretical(n0, n1, n2, phi0, d1, lambda_um)
+    plt.figure(figsize=(10, 6))
+    plt.plot(lambda_um, psi, label=r"$\Psi$")
+    plt.plot(lambda_um, delta, label=r"$\Delta$")
+    plt.xlabel("Wavelength (µm)")
+    plt.ylabel(r"$\Psi$, $\Delta$")
+    plt.xscale('log')
+    plt.legend()
+    plt.savefig("Output/Ellipsometry/{}_ellipsometry_theoretical_psi_delta_vs_lambda_for_{}nm_and_{}°.png".format(metalname, d1 * 1e3, phi0))
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(psi, delta)
+    plt.xlabel(r"$\Psi$")
+    plt.ylabel(r"$\Delta$")
+    plt.savefig("Output/Ellipsometry/{}_ellipsometry_theoretical_psi_vs_delta_for_{}nm_and_{}°.png".format(metalname, d1 * 1e3,phi0))
+
+def read_plot_FTIR(filename):
+    """
+    Read and plot the FTIR spectrum.
+
+    Parameters:
+    filename (str): Path to the file containing the FTIR spectrum.
+    metalname (str): Name of the metal.
+    """
+    data = pd.read_csv(filename)
+    wl = data.iloc[:, 0]  
+    I = data.iloc[:, 1] 
+    data = pd.read_csv("Data/FTIRref_or.CSV")
+    wl_ref = data.iloc[:, 0]
+    I_ref = data.iloc[:, 1]
+
+    data = pd.read_csv("Data/FTIRref_verre.CSV")
+    wl_glass = data.iloc[:, 0]
+    I_glass = data.iloc[:, 1]
+
+    max_glass = np.max(I_glass)
+    I_glass = I_glass/max_glass
+    max_ref = np.max(I_ref)
+    I_ref = I_ref/max_ref
+    max_I = np.max(I)
+    I = I/max_I
+
+  
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(wl, I, label='Sample 1', color='b')
+    plt.plot(wl_ref, I_ref, label='Reference', color='r')
+    plt.plot(wl_glass, I_glass, label='Glass', color='g')
+    plt.xlabel('Wave number (cm$^{-1}$)')
+    plt.ylabel('reflectance')
+    plt.legend()
+    
+    plt.savefig("Output/FTIR/Sample1_FTIR_linear.png")
+
+    wl = 1e4/wl
+    wl_ref = 1e4/wl_ref
+    wl_glass = 1e4/wl_glass
+
+    plt.figure(figsize=(8, 5))
+    plt.semilogx(wl, I, label='Sample 1', color='b')
+    plt.semilogx(wl_ref, I_ref, label='Reference', color='r')
+    plt.semilogx(wl_glass, I_glass, label='Glass', color='g')
+    plt.xlabel('Wavelength (µm)')
+    plt.ylabel('reflectance')
+    plt.xlim(0.2, 20)
+    plt.legend()
+    plt.savefig("Output/FTIR/Sample1_FTIR_log.png")
+
+
+
+
+
+
 if __name__ == "__main__":
     print ("Task 2 :")
     filename = "Data/n_k_combined.txt"
@@ -566,13 +707,7 @@ if __name__ == "__main__":
     d_list = np.logspace(-3, 3, 1000)
     d_val = [0, 1e-3, 10e-3, 100e-3, 1000e-3]
 
-    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, 14e-3, lambda_um, 0, "Reflectivity, Transmissivity, Absorbance vs Thickness for phi0 = 0, thickness = {}".format(14e-3*1e3), True)
-
-    plot_I_vs_d(lambda_um, n0, n1, n2, d_list, 0, Irradiance)
-    
-
-
-
+    read_plot_FTIR("Data/FTIR.CSV")
 
     
 
