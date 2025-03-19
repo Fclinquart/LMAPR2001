@@ -20,7 +20,7 @@
 - [X] Vérifier si T est bon
 - [X] Calculer la Puissance du Rayonnement solaire $1 \frac{W}{m²}$
 - [X] Calculer le produit $F_{transmitted}$ et $F_{reflected}$ et l'optimiser pour trouver d
-- [ ] Plotter $F_{transmitted}$ et $F_{reflected}$ en fonction de d + Discussion
+- [X] Plotter $F_{transmitted}$ et $F_{reflected}$ en fonction de d + Discussion
 - [ ] Calculer d avec UV spectroscopie
 - [ ] Remetrre les graphes et reinterpréte les graphes
 - [ ] Faire un beau wiki, avec des titres, une bibliographie et avec une cohérence dans les articles
