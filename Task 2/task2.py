@@ -184,7 +184,7 @@ def plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, Tilte = "", sav
     if Tilte != "":
         plt.title(Tilte)
     if save:
-        plt.savefig("R_T_A.png")
+        plt.savefig("Output/RTA_phi0_d/RTA_phi0_{}nm_{}.png".format(d1*1e3,phi0))
     else : 
         plt.show()
 
@@ -331,6 +331,18 @@ def plot_I_vs_d( lambda_um, n0, n1, n2, d_list, phi0, Irradiance):
     plt.legend()
     plt.savefig("Output/Fraction_of_spectra_vs_thickness/IR.png")
 
+    # visible vs IR
+    plt.figure(figsize=(10, 6))
+    plt.plot(d_list, T_Visible, label= "Transmissivity (Visible Spectrum)")
+    plt.plot(d_list, R_IR, label= "Reflectivity (IR Spectrum)")
+    plt.xlabel("Thickness (µm)")
+    plt.xscale('log')
+    plt.ylabel("R, T (%)")
+    plt.vlines(Optimal_thickness(d_list, lambda_um, n0, n1, n2, phi0, Irradiance), 0, 100, color = "red", label = "Optimal thickness")
+    plt.legend()
+    plt.savefig("Output/Fraction_of_spectra_vs_thickness/Visible_IR.png")
+    
+
 def plot_R_T_A_vs_d(lambda_um, n0, n1, n2, d_list, phi0):
     fig, axs = plt.subplots(3, 1, figsize=(10, 18), sharex=True)
 
@@ -371,7 +383,16 @@ def plot_R_T_A_vs_d(lambda_um, n0, n1, n2, d_list, phi0):
     plt.tight_layout()
     plt.savefig("Output/RTA_vs_d/RTA_combined_{}.png".format(phi0))
 
+def Optimal_thickness(d_list, lambda_um, n0, n1, n2, phi0, Irradiance):
+    # save d values that maximise the product  R_IR and T_Vis
 
+    R_IR, T_IR, _ = spectral_RTA('IR', lambda_um, n0, n1, n2, d_list, phi0, Irradiance)
+    R_Vis, T_Vis, _ = spectral_RTA('Visible', lambda_um, n0, n1, n2, d_list, phi0, Irradiance)
+    d_opt = []
+    for i, d in enumerate(d_list):
+        d_opt.append(R_IR[i] * T_Vis[i])
+    return d_list[np.argmax(d_opt)]
+        
     
 if __name__ == "__main__":
     print ("Task 2 :")
@@ -383,7 +404,12 @@ if __name__ == "__main__":
     d_list = np.logspace(-3, 3, 1000)
     d_val = [0, 1e-3, 10e-3, 100e-3, 1000e-3]
 
-    plot_R_T_A_vs_d(lambda_um, n0, n1, n2, d_val, 0)
+    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, 14e-3, lambda_um, 0, "Reflectivity, Transmissivity, Absorbance vs Thickness for phi0 = 0, thickness = {}".format(14e-3*1e3), True)
+
+    plot_I_vs_d(lambda_um, n0, n1, n2, d_list, 0, Irradiance)
+    
+
+
 
 
     
