@@ -25,8 +25,8 @@
 - [ ] Remetrre les graphes et reinterpréte les graphes
 - [ ] Faire un beau wiki, avec des titres, une bibliographie et avec une cohérence dans les articles
 - [X] Reprendre le AMST 1.5
-- [ ] Refaire les plot en fontion de la puissance en fonction du spectre
-- [ ] Refaire l'Optimisation
+- [X] Refaire les plot en fontion de la puissance en fonction du spectre
+- [X] Refaire l'Optimisation
 - [ ] Plotter + discussion pour le 21 juin 12h à Bruxelles
 
 ### task 3
@@ -46,7 +46,7 @@
 
 # Module 3 :  ACV
 
-- [ ] **urgent** Se dispatcher le travail
+- [X] **urgent** Se dispatcher le travail
 
 ## To Do Personnelles
 
