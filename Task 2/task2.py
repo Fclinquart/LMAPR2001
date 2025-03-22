@@ -56,6 +56,9 @@ def n_k(filename):
     lambda_um = data[0].values  # Wavelengths in micrometers
     n = data[1].values  # Refractive index
     k = data[2].values  # Extinction coefficient
+    # replace Nan by 0
+    k = np.nan_to_num(k)
+    
     return lambda_um, n, k
 
 def snells(n0, n1, phi0):
@@ -361,7 +364,7 @@ def plot_solar_spectrum(lambda_um, I):
     plt.legend()
     plt.show()
 
-def plot_n_k(lambda_um, n, k):
+def plot_n_k(lambda_um, n, k, title=""):
     """
     Plot the refractive index and extinction coefficient.
 
@@ -378,6 +381,8 @@ def plot_n_k(lambda_um, n, k):
     plt.xscale('log')
     plt.yscale('log')
     plt.legend()
+    if title != "":
+        plt.title(title)
     plt.show()
 
 def spectral_RTA(spectrum: str, lambda_um, n0, n1, n2, d_list: list, phi0, Irradiance):
