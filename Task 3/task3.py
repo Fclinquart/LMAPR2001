@@ -8,89 +8,86 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Task
 sys.path.append(parent_dir)
 import task2 # type: ignore
 
-wl_glass, n0, n1, n2, n3, n_glass = Extraction.n_k_wl_trilayer("Data/ZnS_Querry.txt", "Data/Cu_Hagemann.txt", "Data/ZnS_Querry.txt", "Data/Glass_Palik.txt", 0.2, 20)
+wl_glass, n_air, n_ZnS, n_Cu, n_ZnS, n_glass = Extraction.n_k_wl_trilayer("Data/ZnS_Querry.txt", "Data/Cu_Querry.txt", "Data/ZnS_Querry.txt", "Data/Glass_Palik.txt", 0.2, 20)
+
+# task2.plot_n_k(wl_glass, np.real(n_ZnS), np.imag(n_ZnS),"ZnS")
+# R = task2.reflectivity_semi_infinite_layer(n_air, n_ZnS, 0)
+# plt.plot(wl_glass, R, label="Reflectivity")
+# plt.xscale('log')
+# plt.show()  ### Question pour le prof !!!
+
+task2.plot_R_T_A_fixed_phi0_and_d(n0=n_air, n1=n_ZnS, n2=n_glass, d1=14e-3, lambda_um =wl_glass, phi0=0)
 
 
 
-def compute_R_T_circular_trilayer(n0, n1, n2, n3, d1, d2, d3, wavelength, phi0):
+
+def compute_R_T_A_trilayer(n0, n1, n2, n3, n_glass, d1, d2, d3, wavelength, phi0):
     """
-    Compute reflection (R) and transmission (T) coefficients for circularly polarized light in a trilayer system.
+    Compute reflection (R), transmission (T), and absorbance (A) for a trilayer structure
+    on a semi-infinite glass substrate.
 
     Parameters:
-    n0, n1, n2, n3 (complex): Complex refractive indices of the four layers (air, ZnS, Cu, ZnS, glass).
-    d1, d2, d3 (float): Thicknesses of the ZnS, Cu, and ZnS layers (in µm).
+    n0, n1, n2, n3, n_glass (complex): Refractive indices of air, layer 1, layer 2, layer 3, and the glass.
+    d1, d2, d3 (float): Thicknesses of layers 1, 2, and 3 (in µm).
     wavelength (float): Wavelength of light (in µm).
     phi0 (float): Angle of incidence in degrees (in medium 0, e.g., air).
 
     Returns:
-    tuple: A tuple containing:
-        - R (float): Reflectivity.
-        - T (float): Transmissivity.
-        - A (float): Absorbance.
+    tuple: (R, T, A) - Reflectivity, Transmissivity, Absorbance.
     """
-    print("Task 2 : Calculating reflection and transmission coefficients for circular polarization in a trilayer system...")
-    phi0 = np.radians(phi0)  # Convert angle of incidence to radians
-
-    # Compute angles in each layer using Snell's law
-    sin_phi0 = np.sin(phi0)
-    sin_phi1 = (n0 / n1) * sin_phi0
+    phi0 = np.radians(phi0)  
+    sin_phi1 = (n0 / n1) * np.sin(phi0)
     phi1 = np.arcsin(sin_phi1)
     sin_phi2 = (n1 / n2) * np.sin(phi1)
     phi2 = np.arcsin(sin_phi2)
     sin_phi3 = (n2 / n3) * np.sin(phi2)
     phi3 = np.arcsin(sin_phi3)
-
-    # Compute cosines of angles
+    sin_phi_glass = (n3 / n_glass) * np.sin(phi3)
+    phi_glass = np.arcsin(sin_phi_glass)
     cos_phi0 = np.cos(phi0)
     cos_phi1 = np.cos(phi1)
     cos_phi2 = np.cos(phi2)
     cos_phi3 = np.cos(phi3)
-
-    # Fresnel coefficients for p-polarization
-    r01p = (n1 * cos_phi0 - n0 * cos_phi1) / (n1 * cos_phi0 + n0 * cos_phi1)
-    r12p = (n2 * cos_phi1 - n1 * cos_phi2) / (n2 * cos_phi1 + n1 * cos_phi2)
-    r23p = (n3 * cos_phi2 - n2 * cos_phi3) / (n3 * cos_phi2 + n2 * cos_phi3)
-
-    t01p = (2 * n0 * cos_phi0) / (n1 * cos_phi0 + n0 * cos_phi1)
-    t12p = (2 * n1 * cos_phi1) / (n2 * cos_phi1 + n1 * cos_phi2)
-    t23p = (2 * n2 * cos_phi2) / (n3 * cos_phi2 + n2 * cos_phi3)
-
-    # Fresnel coefficients for s-polarization
-    r01s = (n0 * cos_phi0 - n1 * cos_phi1) / (n0 * cos_phi0 + n1 * cos_phi1)
-    r12s = (n1 * cos_phi1 - n2 * cos_phi2) / (n1 * cos_phi1 + n2 * cos_phi2)
-    r23s = (n2 * cos_phi2 - n3 * cos_phi3) / (n2 * cos_phi2 + n3 * cos_phi3)
-
-    t01s = (2 * n0 * cos_phi0) / (n0 * cos_phi0 + n1 * cos_phi1)
-    t12s = (2 * n1 * cos_phi1) / (n1 * cos_phi1 + n2 * cos_phi2)
-    t23s = (2 * n2 * cos_phi2) / (n2 * cos_phi2 + n3 * cos_phi3)
-
-    # Phase thickness for each layer
+    cos_phi_glass = np.cos(phi_glass)
+    def fresnel_coefficients(n_i, n_j, cos_phi_i, cos_phi_j):
+        rs = (n_i * cos_phi_i - n_j * cos_phi_j) / (n_i * cos_phi_i + n_j * cos_phi_j)
+        rp = (n_j * cos_phi_i - n_i * cos_phi_j) / (n_j * cos_phi_i + n_i * cos_phi_j)
+        ts = 2 * n_i * cos_phi_i / (n_i * cos_phi_i + n_j * cos_phi_j)
+        tp = 2 * n_i * cos_phi_i / (n_j * cos_phi_i + n_i * cos_phi_j)
+        return rs, rp, ts, tp
+    r01s, r01p, t01s, t01p = fresnel_coefficients(n0, n1, cos_phi0, cos_phi1)
+    r12s, r12p, t12s, t12p = fresnel_coefficients(n1, n2, cos_phi1, cos_phi2)
+    r23s, r23p, t23s, t23p = fresnel_coefficients(n2, n3, cos_phi2, cos_phi3)
+    r3Gs, r3Gp, t3Gs, t3Gp = fresnel_coefficients(n3, n_glass, cos_phi3, cos_phi_glass)
     beta1 = 2 * np.pi * d1 * n1 * cos_phi1 / wavelength
     beta2 = 2 * np.pi * d2 * n2 * cos_phi2 / wavelength
     beta3 = 2 * np.pi * d3 * n3 * cos_phi3 / wavelength
 
-    # Reflection coefficients for the trilayer system
-    R_p = (r01p + r12p * np.exp(-2j * beta1) + r23p * np.exp(-2j * (beta1 + beta2))) / \
-          (1 + r01p * r12p * np.exp(-2j * beta1) + r01p * r23p * np.exp(-2j * (beta1 + beta2)) + r12p * r23p * np.exp(-2j * beta2))
-    R_s = (r01s + r12s * np.exp(-2j * beta1) + r23s * np.exp(-2j * (beta1 + beta2))) / \
-          (1 + r01s * r12s * np.exp(-2j * beta1) + r01s * r23s * np.exp(-2j * (beta1 + beta2)) + r12s * r23s * np.exp(-2j * beta2))
+    def multilayer_reflection_transmission(r01, r12, r23, r3G, t01, t12, t23, t3G, beta1, beta2, beta3):
+        M1 = np.array([[np.exp(-1j * beta1), r12 * np.exp(-1j * beta1)], [r12 * np.exp(-1j * beta1), np.exp(1j * beta1)]])
+        M2 = np.array([[np.exp(-1j * beta2), r23 * np.exp(-1j * beta2)], [r23 * np.exp(-1j * beta2), np.exp(1j * beta2)]])
+        M3 = np.array([[np.exp(-1j * beta3), r3G * np.exp(-1j * beta3)], [r3G * np.exp(-1j * beta3), np.exp(1j * beta3)]])
+        
+        
+        M_total = M1 @ M2 @ M3
 
-    # Transmission coefficients for the trilayer system
-    T_p = (t01p * t12p * t23p * np.exp(-1j * (beta1 + beta2 + beta3))) / \
-          (1 + r01p * r12p * np.exp(-2j * beta1) + r01p * r23p * np.exp(-2j * (beta1 + beta2)) + r12p * r23p * np.exp(-2j * beta2))
-    T_s = (t01s * t12s * t23s * np.exp(-1j * (beta1 + beta2 + beta3))) / \
-          (1 + r01s * r12s * np.exp(-2j * beta1) + r01s * r23s * np.exp(-2j * (beta1 + beta2)) + r12s * r23s * np.exp(-2j * beta2))
+        r_total = (r01 + M_total[1, 0] / (1 - r01 * M_total[1, 1]))
+        t_total = (t01 * t12 * t23 * t3G * np.exp(-1j * (beta1 + beta2 + beta3))) / (1 - r01 * M_total[1, 1])
+        
+        return r_total, t_total
 
-    # Circular polarization: average s and p components
-    R = (np.abs(R_p)**2 + np.abs(R_s)**2) / 2
-    T = (np.abs(T_p)**2 + np.abs(T_s)**2) / 2
+    R_s, T_s = multilayer_reflection_transmission(r01s, r12s, r23s, r3Gs, t01s, t12s, t23s, t3Gs, beta1, beta2, beta3)
+    R_p, T_p = multilayer_reflection_transmission(r01p, r12p, r23p, r3Gp, t01p, t12p, t23p, t3Gp, beta1, beta2, beta3)
 
-    # Correction factor for transmission (energy conservation)
-    correction_factor = (n3 * cos_phi3) / (n0 * cos_phi0)
+    
+    R = (np.abs(R_s)**2 + np.abs(R_p)**2) / 2
+    T = (np.abs(T_s)**2 + np.abs(T_p)**2) / 2
 
-    # Absorbance
+    correction_factor = (n_glass * cos_phi_glass) / (n0 * cos_phi0)
+
     A = 1 - R - T * correction_factor
 
-    return R, correction_factor * T, A
+    return R, T, A
 
-
+R, T, A = compute_R_T_A_trilayer(n0=n_air, n1=n_ZnS, n2=n_Cu, n3=n_ZnS, n_glass=n_glass, d1=14e-3, d2=100e-9, d3=14e-3, wavelength=0.55, phi0=0)
+print("R : ", R)

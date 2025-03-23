@@ -80,23 +80,26 @@ def n_k_wl_trilayer(file_path1, file_path2, file_path3, file_path_glass, wl_min,
 
     Returns:
     tuple: A tuple containing:
-        - n0, n1, n2, n3 (complex): Complex refractive indices of the four layers (air, ZnS, Cu, ZnS, glass).
+        - n0, n1, n2, n3 (complex): Complex refractive indices of the four layers.
     """
     wl1, n1, k1 = extract_wl_n_k(file_path1)
     wl2, n2, k2 = extract_wl_n_k(file_path2)
     wl3, n3, k3 = extract_wl_n_k(file_path3)
     wl_glass, n_glass, k_glass = task2.n_k(file_path_glass)
-
     # Filter wavelengths within the specified range
     wl1, n1, k1 = zip(*[(wl, n, k) for wl, n, k in zip(wl1, n1, k1) if wl_min <= wl <= wl_max])
     wl2, n2, k2 = zip(*[(wl, n, k) for wl, n, k in zip(wl2, n2, k2) if wl_min <= wl <= wl_max])
     wl3, n3, k3 = zip(*[(wl, n, k) for wl, n, k in zip(wl3, n3, k3) if wl_min <= wl <= wl_max])
     wl_glass, n_glass, k_glass = zip(*[(wl, n, k) for wl, n, k in zip(wl_glass, n_glass, k_glass) if wl_min <= wl <= wl_max])
+    wl_glass = np.array(wl_glass) 
+    
+    n0 = np.ones(len(wl_glass))
+    n1 = np.interp(wl_glass, wl1, n1) - 1j * np.interp(wl_glass, wl1, k1)
+    n2 = np.interp(wl_glass, wl2, n2) - 1j * np.interp(wl_glass, wl2, k2)
+    n3 = np.interp(wl_glass, wl3, n3) - 1j * np.interp(wl_glass, wl3, k3)
+    n_glass = np.array(n_glass) - 1j * np.array(k_glass)
 
-    n0 = 1.0  # Refractive index of air
-    n1 = np.interp(wl_glass, wl1, n1) + 1j * np.interp(wl_glass, wl1, k1)
-    n2 = np.interp(wl_glass, wl2, n2) + 1j * np.interp(wl_glass, wl2, k2)
-    n3 = np.interp(wl_glass, wl3, n3) + 1j * np.interp(wl_glass, wl3, k3)
-    n_glass = n_glass 
-
+    print("Task 3 : Extracting refractive indices and extinction coefficients for the trilayer system...")
     return wl_glass, n0, n1, n2, n3, n_glass
+
+

@@ -31,11 +31,15 @@
 
 ### task 3
 
-- [ ] prendre RDV pour spectroscopie
+- [x] prendre RDV pour spectroscopie
 - [ ] use ellipsometry and infrared spectroscopy to characterize their performance.
 - [ ] Write a program to compute the optical transmission and reflection by multilayered structures for any angle of incidence, and use it to explore how it is possible to transmit as much light as possible in the visible range while reflecting the rest of the solar spectrum
 - [ ] estimate the electricity you will spare for air-conditioning
 - [ ] Aero-gel
+- [ ] Faire une function qui merge 2 fichier .txt en un pour utiliser plus de donner 
+
+##### Question
+- n-1j ou n+1j 
 
 #### remarques :
 

@@ -364,7 +364,7 @@ def plot_solar_spectrum(lambda_um, I):
     plt.legend()
     plt.show()
 
-def plot_n_k(lambda_um, n, k, title=""):
+def plot_n_k(lambda_um, n, k, title="", log =True):
     """
     Plot the refractive index and extinction coefficient.
 
@@ -378,8 +378,9 @@ def plot_n_k(lambda_um, n, k, title=""):
     plt.plot(lambda_um, k, label="Extinction coefficient")
     plt.xlabel("Wavelength (µm)")
     plt.ylabel("n, k")
-    plt.xscale('log')
-    plt.yscale('log')
+    if log:
+        plt.xscale('log')
+        plt.yscale('log')
     plt.legend()
     if title != "":
         plt.title(title)
@@ -707,12 +708,9 @@ if __name__ == "__main__":
     filename = "Data/n_k_combined.txt"
 
     lambda_um, n0, n1, n2 = refraction_index(filename)
-    Irradiance = Solar_spectrum(filename)
-
-    d_list = np.logspace(-3, 3, 1000)
-    d_val = [0, 1e-3, 10e-3, 100e-3, 1000e-3]
-
-    read_plot_FTIR("Data/FTIR.CSV")
+    print("n1", np.imag(n1))
+   
+    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, 14e-3, lambda_um,0, "Reflectivity, Transmissivity, and Absorbance for Circular Polarization", save=False)
 
     
 
