@@ -64,8 +64,6 @@ def extract_wl_n_k(file_path):
 
     return wl, n, k
 
-
-
 def n_k_wl_trilayer(file_path1, file_path2, file_path3, file_path_glass, wl_min, wl_max):
     """
     Extract refractive indices and extinction coefficients for the trilayer system within a specified wavelength range.
