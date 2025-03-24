@@ -8,6 +8,16 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Task
 sys.path.append(parent_dir)
 import task2 # type: ignore
 
+plt.rcParams.update({
+    'font.size': 16,
+    'axes.titlesize': 20,
+    'axes.labelsize': 18,
+    'legend.fontsize': 18,
+    'xtick.labelsize': 16,
+    'ytick.labelsize': 16
+     # alpha for transparency
+    
+})
 
 
 def layers(config, debug = False):
@@ -57,7 +67,7 @@ def layers(config, debug = False):
            filename.append("Data/ZnS_Querry.txt")
            layers.append(thickness)
         elif material == "Cu":
-            filename.append("Data/Cu_Querry.txt")
+            filename.append("Data/n_k_copper.txt")
             layers.append(thickness)
         elif material == "glass":
             filename.append("Data/Glass_Palik.txt")
@@ -74,7 +84,7 @@ def layers(config, debug = False):
         print("#" * 50)
     print("Task 3 : Generation of the multilayer system : Done")
 
-    return [(np.real(n0), -np.imag(n0),layers[0]), (np.real(n1), -np.imag(n1),layers[1]), (np.real(n2), -np.imag(n2),layers[2]), (np.real(n3), -np.imag(n3),layers[3]), (np.real(n_glass), -np.imag(n_glass),layers[4])]
+    return [ (np.real(n1), -np.imag(n1),layers[0]), (np.real(n2), -np.imag(n2),layers[1]), (np.real(n3), -np.imag(n3),layers[2]), (np.real(n_glass), -np.imag(n_glass),layers[3])]
 
 def calculate_RTA_multilayer(layers, wl, phi0=0):
     """
@@ -108,27 +118,37 @@ def calculate_RTA_multilayer(layers, wl, phi0=0):
     - The transmissivity is corrected to account for the refractive index of the substrate.
     - The final values of R, T, and A are averaged over s- and p-polarizations.
     """
-    phi0 = np.radians(phi0)
 
-    print("Task 3 : Calculation of the Reflectivity, Transmissivity, and Absorbance...")
-    
-    
+    phi0 = np.radians(phi0)
+    n0 = 1.0
+
     # Initialize the scattering matrix S as the identity matrix for each wavelength
     S_p = np.tile(np.eye(2, dtype=complex)[:, :, np.newaxis], (1, 1, len(wl)))
     S_s = np.tile(np.eye(2, dtype=complex)[:, :, np.newaxis], (1, 1, len(wl)))
-    
-    n0 = layers[0][0]
-    x = len (wl)
-    
+
+
+    # Iterate over each layer
     for i, (n, kappa, d) in enumerate(layers):
         N_layer = n - 1j * kappa
+        
+    
+        # Calculate the angle of propagation in the current layer
         sin_theta_layer = n0 * np.sin(phi0) / N_layer
         cos_theta_layer = np.sqrt(1 - sin_theta_layer**2)
+        
+    
+        # Calculate the phase shift beta for all wavelengths
         beta = 2 * np.pi * d * N_layer * cos_theta_layer / wl
-        L = np.zeros((2, 2, x), dtype=complex) # 126 = len(wl)
+        
+    
+        # Create the layer matrix L as a 3D array
+        L = np.zeros((2, 2, len(wl)), dtype=complex)
         L[0, 0, :] = np.exp(1j * beta)  # Forward propagation
         L[1, 1, :] = np.exp(-1j * beta)  # Backward propagation
         
+        
+        
+        # Calculate the Fresnel coefficients for p and s polarizations
         if i == 0:
             N_prev = n0
         else:
@@ -140,40 +160,52 @@ def calculate_RTA_multilayer(layers, wl, phi0=0):
         t_p = (2 * N_prev * np.cos(phi0)) / (N_layer * np.cos(phi0) + N_prev * cos_theta_layer)
         t_s = (2 * N_prev * np.cos(phi0)) / (N_prev * np.cos(phi0) + N_layer * cos_theta_layer)
         
-
-        I_p = np.zeros((2, 2, x), dtype=complex)
+        
+        
+        # Interface matrix I for each wavelength
+        I_p = np.zeros((2, 2, len(wl)), dtype=complex)
         I_p[0, 0, :] = 1 / t_p
         I_p[0, 1, :] = r_p / t_p
         I_p[1, 0, :] = r_p / t_p
         I_p[1, 1, :] = 1 / t_p
         
-        I_s = np.zeros((2, 2, x), dtype=complex)
+        I_s = np.zeros((2, 2, len(wl)), dtype=complex)
         I_s[0, 0, :] = 1 / t_s
         I_s[0, 1, :] = r_s / t_s
         I_s[1, 0, :] = r_s / t_s
         I_s[1, 1, :] = 1 / t_s
         
-        for wl in range(126):
-            S_p[:, :, wl] = np.dot(S_p[:, :, wl], np.dot(I_p[:, :, wl], L[:, :, wl]))
-            S_s[:, :, wl] = np.dot(S_s[:, :, wl], np.dot(I_s[:, :, wl], L[:, :, wl]))
         
         
+        # Update the scattering matrix S for each wavelength
+        for l in range(len(wl)):
+            S_p[:, :, l] = np.dot(S_p[:, :, l], np.dot(I_p[:, :, l], L[:, :, l]))
+            S_s[:, :, l] = np.dot(S_s[:, :, l], np.dot(I_s[:, :, l], L[:, :, l]))
+        
+        
+
+    # Calculate the reflection and transmission coefficients for each wavelength
     R_p = np.abs(S_p[1, 0, :] / S_p[0, 0, :])**2
     R_s = np.abs(S_s[1, 0, :] / S_s[0, 0, :])**2
-    
+
     T_p = np.abs(1 / S_p[0, 0, :])**2
     T_s = np.abs(1 / S_s[0, 0, :])**2
-    
+
+
+    # Correction factor for transmissivity
     n_substrate = layers[-1][0]
     correction_factor = (n_substrate * np.cos(phi0)) / (n0 * np.cos(phi0))
     T_p_corrected = T_p * correction_factor
     T_s_corrected = T_s * correction_factor
-    
+
+
+
+    # Average R and T for unpolarized light
     R = (R_p + R_s) / 2
     T = (T_p_corrected + T_s_corrected) / 2
     A = 1 - R - T
 
-    
+   
     
     return R, T, A
 
@@ -219,26 +251,26 @@ def plot_R_T_A_fixed_phi0_and_d_multilayer(layers, wl,  phi0, title="", save=Fal
     plt.plot(wl, A, label="Absorbance")
     plt.xlabel("Wavelength (µm)")
     plt.xscale('log')
-    plt.axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
-    plt.axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
-    plt.axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
+    plt.axvspan(0.38, 0.8, color="yellow", alpha=0.1, label="Visible Spectrum")
+    plt.axvspan(0.2, 0.38, color="purple", alpha=0.1, label="UV Spectrum")
+    plt.axvspan(0.8, 20, color="red", alpha=0.1, label="IR Spectrum")
     plt.ylabel("R, T, A")
     plt.legend()
     if title != "":
         plt.title(title)
     if save:
-        plt.savefig("Output/RTA_phi0_d/RTA_phi0_{}.png".format(phi0))
+        plt.savefig("Output/RTA_phi0_d/RTA_multilayer_{}.png".format(phi0))
     else:
         plt.show()
 
 
 if __name__ == "__main__":
 
-    config =[ ("air", 30), ("ZnS", 200e-3), ("Cu", 10e-3), ("ZnS", 200e-3), ("glass", 30)]
+    config =[ ("ZnS", 20e-3), ("Cu", 30e-3), ("ZnS", 20e-3), ("glass", 0.5)]
     wl, _, _, _,_,_ = Extraction.n_k_wl_trilayer("Data/ZnS_Querry.txt", "Data/Cu_Querry.txt", "Data/ZnS_Querry.txt", "Data/Glass_Palik.txt", 0.2, 20)
+    
 
-    layers = layers(config, debug=False)
+    lambda_um, n_air, n_zns, n_cu, n_zns, n_glass = Extraction.n_k_wl_trilayer("Data/ZnS_Querry.txt", "Data/Cu_Querry.txt", "Data/ZnS_Querry.txt", "Data/Glass_Palik.txt", 0.2, 20)
 
-    plot_R_T_A_fixed_phi0_and_d_multilayer(layers, wl, 0, title="Reflectivity, Transmissivity, and Absorbance for a Multi-layered System", save=False)
-
-   
+    layers = layers(config, debug = False)
+    plot_R_T_A_fixed_phi0_and_d_multilayer(layers, wl, 0, title="Reflectivity, Transmissivity, and Absorbance of a Multilayer System", save=False)
