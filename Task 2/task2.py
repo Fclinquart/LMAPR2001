@@ -712,6 +712,10 @@ if __name__ == "__main__":
    
     plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, 14e-3, lambda_um,0, "Reflectivity, Transmissivity, and Absorbance for Circular Polarization", save=False)
 
+    I = Solar_spectrum(filename)
+
+    plot_solar_spectrum(lambda_um, I)
+
     
 
     
