@@ -11,8 +11,12 @@
 
 - [ ] Calculer ad inibo
 - [ ] Étude de la convergence
-- [ ] Reinterpereter les graphes + ajout Graphes
+
+### Pour dimanche 30/03 
+- [ ] Reinterpereter les graphes (résonance avec Palik ou le livre de Fox) + ajout Graphes 
 - [ ] remettre le graphe en log/log de n et k avce plot_n_k()
+- [ ] Remttre une section sur l'importance des données, des conditions expérimentales, mettre sur un plot log/log n et $\kappa$ pour plusieur donnée (Hagemann, Palik,...)
+**NB : Après tout nos graphe avec l'argent sont basé sur Hagemann et al 1974**
 - [ ] Faire un beau wiki, avec des titres, une bibliographie et avec une cohérence dans les articles
 
 ### Clôturer la task 2
@@ -21,19 +25,27 @@
 - [X] Calculer la Puissance du Rayonnement solaire $1 \frac{W}{m²}$
 - [X] Calculer le produit $F_{transmitted}$ et $F_{reflected}$ et l'optimiser pour trouver d
 - [X] Plotter $F_{transmitted}$ et $F_{reflected}$ en fonction de d + Discussion
-- [ ] Calculer d avec UV spectroscopie
-- [ ] Remetrre les graphes et reinterpréte les graphes
-- [ ] Faire un beau wiki, avec des titres, une bibliographie et avec une cohérence dans les articles
 - [X] Reprendre le AMST 1.5
 - [X] Refaire les plot en fontion de la puissance en fonction du spectre
 - [X] Refaire l'Optimisation
+### Pour dimanche 30/03 
+- [ ] remplacer tout les graphes 
+- [ ] explication avec le livre de Fox 
+- [ ] Mettre les plot pourcentage visible vs IR 
+- [ ] Expliquer l'optimisation pour trouver d 
+- [ ] Interpretation quels sont les limites de la technologie 
 - [ ] Plotter + discussion pour le 21 juin 12h à Bruxelles
+- [ ] le FTIR 
+- [ ] Calculer d avec UV spectroscopie
+- [ ] Remetrre les graphes et reinterpréte les graphes
+- [ ] Faire un beau wiki, avec des titres, une bibliographie et avec une cohérence dans les articles
 
 ### task 3
 
 - [x] prendre RDV pour spectroscopie
 - [ ] use ellipsometry and infrared spectroscopy to characterize their performance.
-- [ ] Write a program to compute the optical transmission and reflection by multilayered structures for any angle of incidence, and use it to explore how it is possible to transmit as much light as possible in the visible range while reflecting the rest of the solar spectrum
+
+- [x] Write a program to compute the optical transmission and reflection by multilayered structures for any angle of incidence, and use it to explore how it is possible to transmit as much light as possible in the visible range while reflecting the rest of the solar spectrum
 - [ ] estimate the electricity you will spare for air-conditioning
 - [ ] Aero-gel
 - [ ] Faire une function qui merge 2 fichier .txt en un pour utiliser plus de donner 
