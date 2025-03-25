@@ -58,7 +58,7 @@ def process_solar_spectra(sun_file, output_file):
 
 
 path_glass = "Data/n_k_glass.txt"
-path_silver = "Data/n_k_Cu.txt"
+path_silver = "Data/n_k_ag2.txt"
 path_csv_sun = "Data/AM0AM1_5.xls"
 path_sun = "Data/ASTM1.5Global.txt"
 

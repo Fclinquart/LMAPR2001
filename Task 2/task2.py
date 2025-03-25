@@ -708,16 +708,11 @@ if __name__ == "__main__":
     filename = "Data/n_k_combined.txt"
 
     lambda_um, n0, n1, n2 = refraction_index(filename)
-    print("n1", np.imag(n1))
    
-    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, 14e-3, lambda_um,0, "Reflectivity, Transmissivity, and Absorbance for Circular Polarization", save=False)
+  
 
-    I = Solar_spectrum(filename)
-
-    plot_solar_spectrum(lambda_um, I)
-
-    
-
+    R_UV, T_UV, A_UV = spectral_RTA('UV', lambda_um, n0, n1, n2, [10e-3], 0, Solar_spectrum(filename))
+    print("Reflectivity in UV spectrum for 10 nm thickness: ", R_UV)
     
 
 

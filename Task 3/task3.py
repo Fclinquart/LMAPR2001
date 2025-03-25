@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import sys 
 import os
 import Extraction
+import scipy.optimize as opt
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Task 2'))
 sys.path.append(parent_dir)
 import task2 # type: ignore
@@ -263,14 +264,142 @@ def plot_R_T_A_fixed_phi0_and_d_multilayer(layers, wl,  phi0, title="", save=Fal
     else:
         plt.show()
 
+def objective_function(thicknesses, layers_config, wl, phi0=0):
+    """Fonction objectif pour l'optimisation."""
+    # Mise à jour des épaisseurs
+    updated_config = []
+    thickness_idx = 0
+    
+    for material, _ in layers_config:  # On ignore l'épaisseur originale
+        if material == "air":
+            updated_config.append((material, 0))  # Épaisseur air fixée à 0
+        elif material == "glass":
+            updated_config.append((material, 0.5))  # Épaisseur verre fixée à 0.5 µm
+        else:
+            # Pour ZnS et Cu, utiliser les valeurs d'optimisation
+            updated_config.append((material, thicknesses[thickness_idx]))
+            thickness_idx += 1
+    
+    # Calcul des propriétés optiques
+    optical_layers = layers(updated_config)
+    R, T, A = calculate_RTA_multilayer(optical_layers, wl, phi0)
+    
+    # Calcul du score
+    mask_T = (wl >= 0.4) & (wl <= 0.7)
+    mask_R = ~mask_T
+    T_mean = np.mean(T[mask_T])
+    R_mean = np.mean(R[mask_R])
+    score = 1/ (R_mean*T_mean)
+    
+    return score
+
+def optimize_layer_thicknesses(layers_config, wl, phi0=0, bounds=None, initial_guess=None):
+    """
+    Optimizes layer thicknesses to maximize T in visible range (0.4-0.7 µm) 
+    and R in other wavelength ranges.
+    
+    Parameters:
+    -----------
+    layers_config : list of tuples
+        Layer configuration (material names and initial thicknesses)
+    wl : array-like
+        Wavelengths in micrometers
+    phi0 : float, optional
+        Angle of incidence in degrees (default is 0°)
+    bounds : list of tuples, optional
+        Bounds for thicknesses in µm (default is (0.001, 1) for each layer)
+    initial_guess : array-like, optional
+        Initial guess for thicknesses (default is original thicknesses)
+        
+    Returns:
+    --------
+    OptimizeResult: Result object from scipy.optimize.minimize
+    """
+    # Prepare initial guess (skip air layers)
+    if initial_guess is None:
+        initial_guess = [thickness for material, thickness in layers_config if material != "air"]
+    
+    # Prepare bounds (default: 1 nm to 1 µm for each layer)
+    if bounds is None:
+        bounds = [(0.001, 1) for _ in initial_guess]
+    
+    # Optimize using L-BFGS-B method (supports bounds)
+    result = opt.minimize(
+        objective_function,
+        initial_guess,
+        args=(layers_config, wl, phi0),
+        bounds=bounds,
+        method='L-BFGS-B',
+        options={'maxiter': 100, 'disp': True}
+    )
+    
+    return result
+
+def plot_optimization_landscape(layers_config, wl, d_ZnS_range, d_Cu_range, phi0=0):
+    """
+    Trace le paysage d'optimisation en 2D pour différentes épaisseurs de ZnS et Cu.
+    """
+    # Création du meshgrid
+    D_ZnS, D_Cu = np.meshgrid(d_ZnS_range, d_Cu_range)
+    scores = np.zeros_like(D_ZnS)
+    
+    # Calcul du score pour chaque combinaison
+    for i in range(len(d_ZnS_range)):
+        for j in range(len(d_Cu_range)):
+            # Créer le tableau d'épaisseurs dans l'ordre: [ZnS1, Cu, ZnS2]
+            current_thicknesses = [
+                d_ZnS_range[i],  # ZnS1
+                d_Cu_range[j],   # Cu
+                d_ZnS_range[i]   # ZnS2 (même que ZnS1)
+            ]
+            
+            # Calcul du score
+            scores[j,i] = objective_function(current_thicknesses, layers_config, wl, phi0)
+    
+    # Plot
+    plt.figure(figsize=(12, 8))
+    contour = plt.contourf(D_ZnS, D_Cu, scores, levels=50, cmap='viridis')
+    plt.colorbar(contour, label='Score (à minimiser)')
+    plt.xlabel('Épaisseur ZnS (µm)')
+    plt.ylabel('Épaisseur Cu (µm)')
+    plt.title('Paysage d\'optimisation RTA')
+    plt.show()
 
 if __name__ == "__main__":
-
-    config =[ ("ZnS", 20e-3), ("Cu", 30e-3), ("ZnS", 20e-3), ("glass", 0.5)]
-    wl, _, _, _,_,_ = Extraction.n_k_wl_trilayer("Data/ZnS_Querry.txt", "Data/Cu_Querry.txt", "Data/ZnS_Querry.txt", "Data/Glass_Palik.txt", 0.2, 20)
+    # Configuration initiale
+    config = [("air", 0), ("ZnS", 20e-3), ("Cu", 30e-3), ("ZnS", 20e-3), ("glass", 0.5)]
     
+    # Longueurs d'onde
+    wl, _, _, _, _, _ = Extraction.n_k_wl_trilayer("Data/ZnS_Querry.txt", "Data/Cu_Querry.txt", 
+                                                  "Data/ZnS_Querry.txt", "Data/Glass_Palik.txt", 0.2, 20)
+    
+    # Optimisation
+    result = optimize_layer_thicknesses(config, wl)
+    
+    if result.success:
+        print("Optimisation réussie!")
+        print("Épaisseurs optimisées (µm):", result.x)
+        
+        # Mettre à jour la configuration avec les nouvelles épaisseurs
+        optimized_config = config.copy()
+        thickness_idx = 0
+        for i, (material, _) in enumerate(optimized_config):
+            if material != "air":
+                optimized_config[i] = (material, result.x[thickness_idx])
+                thickness_idx += 1
+                
+        # Visualiser les résultats optimisés
+        optical_layers = layers(optimized_config)
+        plot_R_T_A_fixed_phi0_and_d_multilayer(optical_layers, wl, 0, 
+                                             title="Performances optiques après optimisation")
+    else:
+        print("L'optimisation a échoué:", result.message)
 
-    lambda_um, n_air, n_zns, n_cu, n_zns, n_glass = Extraction.n_k_wl_trilayer("Data/ZnS_Querry.txt", "Data/Cu_Querry.txt", "Data/ZnS_Querry.txt", "Data/Glass_Palik.txt", 0.2, 20)
 
-    layers = layers(config, debug = False)
-    plot_R_T_A_fixed_phi0_and_d_multilayer(layers, wl, 0, title="Reflectivity, Transmissivity, and Absorbance of a Multilayer System", save=False)
+    
+    # Définir les plages d'épaisseurs à explorer [µm]
+    d_ZnS_range = np.linspace(0.01, 0.1, 30)  # 10nm à 100nm
+    d_Cu_range = np.linspace(0.01, 0.2, 30)   # 10nm à 200nm
+    
+    # Générer le plot
+    plot_optimization_landscape(config, wl, d_ZnS_range, d_Cu_range)

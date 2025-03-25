@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import sys
 import os
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Task 2'))
@@ -100,4 +101,54 @@ def n_k_wl_trilayer(file_path1, file_path2, file_path3, file_path_glass, wl_min,
     print("Task 3 : Extracting refractive indices and extinction coefficients for the trilayer system...")
     return wl_glass, n0, n1, n2, n3, n_glass
 
+def extract_solar_irrandiance(file_path, plot=False):
+    """
+    Extract solar irradiance data from a .txt file.
 
+    Parameters:
+    file_path (str): Path to the .txt file.
+
+    Returns:
+    tuple: A tuple containing:
+        - wl (list): List of wavelengths in micrometers.
+        - solar_irradiance (list): List of solar irradiance values.
+    """
+    wl = []  # Wavelength
+    solar_irradiance = []  # Solar irradiance
+
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+        for line in lines:
+            # Skip empty lines
+            if not line.strip():
+                continue
+
+            parts = line.split()
+            if len(parts) == 2:
+                wl.append(float(parts[0])/1000)
+                solar_irradiance.append(float(parts[1])*1000)
+    if plot:
+        plt.plot(wl, solar_irradiance)
+        plt.xlabel("Wavelength (µm)")
+        plt.ylabel("Solar Irradiance (W/m²/µm)")
+        plt.title("Solar Irradiance Spectrum")
+        plt.xscale("log")
+        plt.savefig("Output/Solar Spectrum - ASTM1.5/ASTM1.5Global.png")
+
+    return wl, solar_irradiance
+
+def solar_interpolation(file_path, wl):
+    """
+    Interpolate solar irradiance data to match the wavelength range of the trilayer system.
+
+    Parameters:
+    file_path (str): Path to the .txt file containing solar irradiance data.
+    wl (numpy.ndarray): Wavelength range of the trilayer system.
+
+    Returns:
+    numpy.ndarray: Interpolated solar irradiance values.
+    """
+    wl_solar, solar_irradiance = extract_solar_irrandiance(file_path)
+    solar_irradiance_interp = np.interp(wl, wl_solar, solar_irradiance)
+    return solar_irradiance_interp
