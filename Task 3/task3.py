@@ -5,68 +5,28 @@ import sys
 import os
 import Extraction
 import scipy.optimize as opt
+from scipy.optimize import minimize
+
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Task 2'))
 sys.path.append(parent_dir)
 import task2 # type: ignore
 
-plt.rcParams.update({
-    'font.size': 16,
-    'axes.titlesize': 20,
-    'axes.labelsize': 18,
-    'legend.fontsize': 18,
-    'xtick.labelsize': 16,
-    'ytick.labelsize': 16
-     # alpha for transparency
-    
-})
 
 
-def layers(config, debug = False):
-    """
-    Generates the multilayer system based on the given configuration.
-
-    Parameters:
-    -----------
-    config : list of tuples
-        A list where each element is a tuple containing:
-        - material (str): The name of the material (e.g., "air", "ZnS", "Cu", "glass").
-        - thickness (float): The thickness of the layer in nanometers.
-    debug : bool, optional
-        If True, prints debugging information (default is False).
-
-    Returns:
-    --------
-    list of tuples:
-        Each tuple represents a layer and contains:
-        - real(n): Real part of the refractive index.
-        - -imag(n): Negative imaginary part of the refractive index (extinction coefficient).
-        - thickness (float): Thickness of the layer in nanometers.
-
-    Notes:
-    ------
-    - The function reads refractive index data from external files specific to each material.
-    - The function raises a ValueError if an unknown material is encountered.
-    - The refractive index values are extracted using the `Extraction.n_k_wl_trilayer` function.
-    - The generated layer stack is used for optical calculations in subsequent functions.
-
-    """
-    print("Task 3 : Generation of the multilayer system...")
+def layers(config, debug=False):
+    """Génère le système multicouche basé sur la configuration donnée."""
     layers = []
     filename = []
     for material, thickness in config:
-        if debug :
+        if debug:
             print("#" * 50)
-            print("Debug information:")
             print(f"Material: {material}, Thickness: {thickness}")
-            print("Number of layers: ", len(layers))
-            print("#" * 50)
-
 
         if material == "air":
             layers.append(thickness)
         elif material == "ZnS":
-           filename.append("Data/ZnS_Querry.txt")
-           layers.append(thickness)
+            filename.append("Data/ZnS_Querry.txt")
+            layers.append(thickness)
         elif material == "Cu":
             filename.append("Data/n_k_copper.txt")
             layers.append(thickness)
@@ -75,115 +35,80 @@ def layers(config, debug = False):
             layers.append(thickness)
         else:
             raise ValueError(f"Unknown material {material}")
-        
     
-    wl , n0, n1 , n2,  n3 , n_glass = Extraction.n_k_wl_trilayer(filename[0], filename[1], filename[2], filename[3], 0.2, 20)
+    wl, n0, n1, n2, n3, n_glass = Extraction.n_k_wl_trilayer(filename[0], filename[1], filename[2], filename[3], 0.2, 20)
     if debug:
-        print("#" * 50)
-        print("Taille des couches: ", len(layers))
-        print("Tailles des couches en nm : ", layers)
-        print("#" * 50)
-    print("Task 3 : Generation of the multilayer system : Done")
-
-    return [ (np.real(n1), -np.imag(n1),layers[0]), (np.real(n2), -np.imag(n2),layers[1]), (np.real(n3), -np.imag(n3),layers[2]), (np.real(n_glass), -np.imag(n_glass),layers[3])]
+        print(layers)
+    return [ (np.real(n1), -np.imag(n1),layers[1]), (np.real(n2), -np.imag(n2),layers[2]), (np.real(n3), -np.imag(n3),layers[3]), (np.real(n_glass), -np.imag(n_glass),layers[4])]
 
 def calculate_RTA_multilayer(layers, wl, phi0=0):
     """
-    Computes the Reflectivity (R), Transmissivity (T), and Absorbance (A) 
-    of a multilayer optical system for a given range of wavelengths.
-
+    Calculate Reflectivity, Transmissivity, and Absorbance for a multi-layered system.
+    
     Parameters:
-    -----------
-    layers : list of tuples
-        A list where each tuple represents a layer and contains:
-        - n (float): Real part of the refractive index.
-        - kappa (float): Extinction coefficient (negative imaginary part of n).
-        - d (float): Thickness of the layer in micrometers.
-    wl : array-like
-        Wavelengths in micrometers at which R, T, and A will be computed.
-    phi0 : float, optional
-        Angle of incidence in degrees (default is 0°).
-
+    layers: list of tuples, each tuple contains (n, kappa, d) for each layer
+            where n is the refractive index, kappa is the extinction coefficient,
+            and d is the thickness in micrometers.
+    lambda_um: array-like, wavelength in micrometers.
+    angle_incidence_deg: angle of incidence in degrees.
+    
     Returns:
-    --------
-    tuple of arrays:
-        - R (array): Reflectivity as a function of wavelength.
-        - T (array): Transmissivity as a function of wavelength.
-        - A (array): Absorbance as a function of wavelength.
-
-    Notes:
-    ------
-    - The function uses a transfer matrix approach to compute R, T, and A.
-    - The multilayer structure is defined by its optical constants (n, kappa) 
-      and thicknesses (d) for each layer.
-    - The transmissivity is corrected to account for the refractive index of the substrate.
-    - The final values of R, T, and A are averaged over s- and p-polarizations.
+    R: Reflectivity
+    T: Transmissivity
+    A: Absorbance
     """
-
-    phi0 = np.radians(phi0)
-    n0 = 1.0
+    angle_incidence = np.radians(phi0)
+    N_air = 1.0
 
     # Initialize the scattering matrix S as the identity matrix for each wavelength
     S_p = np.tile(np.eye(2, dtype=complex)[:, :, np.newaxis], (1, 1, len(wl)))
     S_s = np.tile(np.eye(2, dtype=complex)[:, :, np.newaxis], (1, 1, len(wl)))
 
-
     # Iterate over each layer
     for i, (n, kappa, d) in enumerate(layers):
         N_layer = n - 1j * kappa
-        
-    
+
         # Calculate the angle of propagation in the current layer
-        sin_theta_layer = n0 * np.sin(phi0) / N_layer
+        sin_theta_layer = N_air * np.sin(angle_incidence) / N_layer
         cos_theta_layer = np.sqrt(1 - sin_theta_layer**2)
-        
-    
+
         # Calculate the phase shift beta for all wavelengths
         beta = 2 * np.pi * d * N_layer * cos_theta_layer / wl
-        
-    
+
         # Create the layer matrix L as a 3D array
         L = np.zeros((2, 2, len(wl)), dtype=complex)
         L[0, 0, :] = np.exp(1j * beta)  # Forward propagation
         L[1, 1, :] = np.exp(-1j * beta)  # Backward propagation
-        
-        
-        
+
         # Calculate the Fresnel coefficients for p and s polarizations
         if i == 0:
-            N_prev = n0
+            N_prev = N_air
         else:
             N_prev = layers[i-1][0] - 1j * layers[i-1][1]
-        
-        r_p = (N_layer * np.cos(phi0) - N_prev * cos_theta_layer) / (N_layer * np.cos(phi0) + N_prev * cos_theta_layer)
-        r_s = (N_prev * np.cos(phi0) - N_layer * cos_theta_layer) / (N_prev * np.cos(phi0) + N_layer * cos_theta_layer)
-        
-        t_p = (2 * N_prev * np.cos(phi0)) / (N_layer * np.cos(phi0) + N_prev * cos_theta_layer)
-        t_s = (2 * N_prev * np.cos(phi0)) / (N_prev * np.cos(phi0) + N_layer * cos_theta_layer)
-        
-        
-        
+
+        r_p = (N_layer * np.cos(angle_incidence) - N_prev * cos_theta_layer) / (N_layer * np.cos(angle_incidence) + N_prev * cos_theta_layer)
+        r_s = (N_prev * np.cos(angle_incidence) - N_layer * cos_theta_layer) / (N_prev * np.cos(angle_incidence) + N_layer * cos_theta_layer)
+
+        t_p = (2 * N_prev * np.cos(angle_incidence)) / (N_layer * np.cos(angle_incidence) + N_prev * cos_theta_layer)
+        t_s = (2 * N_prev * np.cos(angle_incidence)) / (N_prev * np.cos(angle_incidence) + N_layer * cos_theta_layer)
+
         # Interface matrix I for each wavelength
         I_p = np.zeros((2, 2, len(wl)), dtype=complex)
         I_p[0, 0, :] = 1 / t_p
         I_p[0, 1, :] = r_p / t_p
         I_p[1, 0, :] = r_p / t_p
         I_p[1, 1, :] = 1 / t_p
-        
+
         I_s = np.zeros((2, 2, len(wl)), dtype=complex)
         I_s[0, 0, :] = 1 / t_s
         I_s[0, 1, :] = r_s / t_s
         I_s[1, 0, :] = r_s / t_s
         I_s[1, 1, :] = 1 / t_s
-        
-        
-        
+
         # Update the scattering matrix S for each wavelength
-        for l in range(len(wl)):
-            S_p[:, :, l] = np.dot(S_p[:, :, l], np.dot(I_p[:, :, l], L[:, :, l]))
-            S_s[:, :, l] = np.dot(S_s[:, :, l], np.dot(I_s[:, :, l], L[:, :, l]))
-        
-        
+        for i in range(len(wl)):
+            S_p[:, :, i] = np.dot(S_p[:, :, i], np.dot(I_p[:, :, i], L[:, :, i]))
+            S_s[:, :, i] = np.dot(S_s[:, :, i], np.dot(I_s[:, :, i], L[:, :, i]))
 
     # Calculate the reflection and transmission coefficients for each wavelength
     R_p = np.abs(S_p[1, 0, :] / S_p[0, 0, :])**2
@@ -192,91 +117,31 @@ def calculate_RTA_multilayer(layers, wl, phi0=0):
     T_p = np.abs(1 / S_p[0, 0, :])**2
     T_s = np.abs(1 / S_s[0, 0, :])**2
 
-
     # Correction factor for transmissivity
     n_substrate = layers[-1][0]
-    correction_factor = (n_substrate * np.cos(phi0)) / (n0 * np.cos(phi0))
+    correction_factor = (n_substrate * np.cos(angle_incidence)) / (N_air * np.cos(angle_incidence))
     T_p_corrected = T_p * correction_factor
     T_s_corrected = T_s * correction_factor
-
-
 
     # Average R and T for unpolarized light
     R = (R_p + R_s) / 2
     T = (T_p_corrected + T_s_corrected) / 2
     A = 1 - R - T
 
-   
-    
     return R, T, A
 
-def plot_R_T_A_fixed_phi0_and_d_multilayer(layers, wl,  phi0, title="", save=False):
-    """
-    Plots the Reflectivity (R), Transmissivity (T), and Absorbance (A) 
-    of a multilayer optical system for a fixed angle of incidence.
-
-    Parameters:
-    -----------
-    layers : list of tuples
-        A list where each tuple represents a layer and contains:
-        - n (float): Real part of the refractive index.
-        - kappa (float): Extinction coefficient (negative imaginary part of n).
-        - d (float): Thickness of the layer in micrometers.
-    wl : array-like
-        Wavelengths in micrometers at which R, T, and A will be computed.
-    phi0 : float
-        Angle of incidence in degrees.
-    title : str, optional
-        Title of the plot (default is an empty string).
-    save : bool, optional
-        If True, saves the plot as an image file instead of displaying it (default is False).
-
-    Returns:
-    --------
-    None
-
-    Notes:
-    ------
-    - The function computes R, T, and A using `calculate_RTA_multilayer` 
-      and plots them as a function of wavelength.
-    - The plot highlights the visible (0.38-0.8 µm), UV (0.2-0.38 µm), and 
-      IR (0.8-20 µm) spectral regions for better visualization.
-    - If `save=True`, the plot is saved in the "Output/RTA_phi0_d" directory 
-      with a filename based on the angle of incidence.
-    """
-
-    R, T, A = calculate_RTA_multilayer(layers, wl, phi0)
-    plt.figure(figsize=(10, 6))
-    plt.plot(wl, R, label="Reflectivity")
-    plt.plot(wl, T, label="Transmissivity")
-    plt.plot(wl, A, label="Absorbance")
-    plt.xlabel("Wavelength (µm)")
-    plt.xscale('log')
-    plt.axvspan(0.38, 0.8, color="yellow", alpha=0.1, label="Visible Spectrum")
-    plt.axvspan(0.2, 0.38, color="purple", alpha=0.1, label="UV Spectrum")
-    plt.axvspan(0.8, 20, color="red", alpha=0.1, label="IR Spectrum")
-    plt.ylabel("R, T, A")
-    plt.legend()
-    if title != "":
-        plt.title(title)
-    if save:
-        plt.savefig("Output/RTA_phi0_d/RTA_multilayer_{}.png".format(phi0))
-    else:
-        plt.show()
-
-def objective_function(thicknesses, layers_config, wl, phi0=0):
-    """Fonction objectif pour l'optimisation."""
+def objective_function(thicknesses, layers_config, wl, Irradiance, phi0=0, Spectrum_UV_IR = False):
+    """Fonction objectif pour l'optimisation avec irradiance."""
     # Mise à jour des épaisseurs
     updated_config = []
     thickness_idx = 0
     
-    for material, _ in layers_config:  # On ignore l'épaisseur originale
+    for material, _ in layers_config:
         if material == "air":
-            updated_config.append((material, 0))  # Épaisseur air fixée à 0
+            updated_config.append((material, 0))
         elif material == "glass":
-            updated_config.append((material, 0.5))  # Épaisseur verre fixée à 0.5 µm
+            updated_config.append((material, 0.5))
         else:
-            # Pour ZnS et Cu, utiliser les valeurs d'optimisation
             updated_config.append((material, thicknesses[thickness_idx]))
             thickness_idx += 1
     
@@ -284,60 +149,147 @@ def objective_function(thicknesses, layers_config, wl, phi0=0):
     optical_layers = layers(updated_config)
     R, T, A = calculate_RTA_multilayer(optical_layers, wl, phi0)
     
-    # Calcul du score
+    # Calcul du score pondéré par l'irradiance
     mask_T = (wl >= 0.4) & (wl <= 0.7)
-    mask_R = ~mask_T
-    T_mean = np.mean(T[mask_T])
-    R_mean = np.mean(R[mask_R])
-    score = 1/ (R_mean*T_mean)
+    if Spectrum_UV_IR : 
+        mask_R = ~mask_T
+    else :
+        mask_R = (wl > 0.7) & (wl <= 20)
+    
+    # Intégration pondérée par l'irradiance
+    T_integrated = np.trapz(T[mask_T] * Irradiance[mask_T], wl[mask_T])
+    R_integrated = np.trapz(R[mask_R] * Irradiance[mask_R], wl[mask_R])
+    
+    # Score à minimiser (on veut maximiser T dans le visible et R ailleurs)
+    score = 1/(T_integrated * R_integrated + 1e-10)  # +1e-10 pour éviter division par zéro
     
     return score
 
-def optimize_layer_thicknesses(layers_config, wl, phi0=0, bounds=None, initial_guess=None):
+def optimize_layer_thicknesses(layers_config, wl, Irradiance, phi0=0, bounds=None, Spectrum_UV_IR = False):
     """
-    Optimizes layer thicknesses to maximize T in visible range (0.4-0.7 µm) 
-    and R in other wavelength ranges.
-    
-    Parameters:
-    -----------
-    layers_config : list of tuples
-        Layer configuration (material names and initial thicknesses)
-    wl : array-like
-        Wavelengths in micrometers
-    phi0 : float, optional
-        Angle of incidence in degrees (default is 0°)
-    bounds : list of tuples, optional
-        Bounds for thicknesses in µm (default is (0.001, 1) for each layer)
-    initial_guess : array-like, optional
-        Initial guess for thicknesses (default is original thicknesses)
-        
-    Returns:
-    --------
-    OptimizeResult: Result object from scipy.optimize.minimize
+    Optimise les épaisseurs en tenant compte de l'irradiance solaire.
     """
-    # Prepare initial guess (skip air layers)
-    if initial_guess is None:
-        initial_guess = [thickness for material, thickness in layers_config if material != "air"]
+    # Extraire les épaisseurs initiales (sauf air et verre)
+    initial_thicknesses = [thickness for material, thickness in layers_config 
+                         if material not in ("air", "glass")]
     
-    # Prepare bounds (default: 1 nm to 1 µm for each layer)
+    # Vérification
+    if len(initial_thicknesses) != 3:
+        raise ValueError("La configuration doit contenir exactement 3 couches à optimiser (ZnS, Cu, ZnS)")
+    
+    # Bornes par défaut (1nm à 1µm)
     if bounds is None:
-        bounds = [(0.001, 1) for _ in initial_guess]
+        bounds = [(0.0001, 4000) for _ in initial_thicknesses]
     
-    # Optimize using L-BFGS-B method (supports bounds)
-    result = opt.minimize(
+    # Optimisation
+    result = minimize(
         objective_function,
-        initial_guess,
-        args=(layers_config, wl, phi0),
+        initial_thicknesses,
+        args=(layers_config, wl, Irradiance, phi0),
         bounds=bounds,
         method='L-BFGS-B',
         options={'maxiter': 100, 'disp': True}
     )
     
-    return result
+    if result.success:
+        return result.x[0], result.x[1], result.x[2]  # ZnS1, Cu, ZnS2
+    else:
+        raise RuntimeError(f"Optimization failed: {result.message}")
 
-def plot_optimization_landscape(layers_config, wl, d_ZnS_range, d_Cu_range, phi0=0):
+def plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, Irradiance = False, phi0=0, title="", save=False):
     """
-    Trace le paysage d'optimisation en 2D pour différentes épaisseurs de ZnS et Cu.
+    Plots the Reflectivity (R), Transmissivity (T), and Absorbance (A) 
+    of a multilayer optical system for a fixed angle of incidence,
+    along with the solar irradiance spectrum.
+    
+    Parameters:
+    -----------
+    layers : list of tuples
+        A list where each tuple represents a layer and contains:
+        - n (float): Real part of the refractive index.
+        - kappa (float): Extinction coefficient.
+        - d (float): Thickness of the layer in micrometers.
+    wl : array-like
+        Wavelengths in micrometers.
+    Irradiance : array-like
+        Solar irradiance data corresponding to wavelengths.
+    phi0 : float, optional
+        Angle of incidence in degrees (default is 0°).
+    title : str, optional
+        Title of the plot.
+    save : bool, optional
+        If True, saves the plot as an image file.
+
+    """
+    l = layers(config)
+    R, T, A = calculate_RTA_multilayer(l, wl, phi0)
+
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+    
+    # Plot RTA on primary y-axis
+    ax1.plot(wl, R, 'r-', label="Reflectivity", linewidth=2)
+    ax1.plot(wl, T, 'g-', label="Transmissivity", linewidth=2)
+    ax1.plot(wl, A, 'b-', label="Absorbance", linewidth=2)
+    ax1.set_xlabel("Wavelength (µm)")
+    ax1.set_ylabel("R, T, A")
+    ax1.set_xscale('log')
+    
+    # Create secondary y-axis for irradiance
+    if Irradiance is not False:
+        wl_sol, Irradiance = Extraction.extract_solar_irrandiance("Data/ASTM1.5Global.txt", plot=False)
+
+        ax2 = ax1.twinx()
+        ax2.plot(wl_sol, Irradiance, 'k--', alpha=0.5, label="Solar Irradiance")
+        ax2.set_ylabel("Irradiance (W/m²/µm)", color='k')
+        ax2.tick_params('y', colors='k')
+    
+    # Add spectral regions
+    ax1.axvspan(0.38, 0.8, color="yellow", alpha=0.05, label="Visible")
+    ax1.axvspan(0.2, 0.38, color="purple", alpha=0.05, label="UV")
+    ax1.axvspan(0.8, 20, color="red", alpha=0.05, label="IR")
+    
+    # Add a legend for the system configuration
+     # Add a legend for the system configuration
+    # system_legend = "System Configuration:\n"
+    # for i, layer in enumerate(layer_configs):
+    #     system_legend += f"Layer {i+1}: {layer['material']} ({layer['thickness']*1000:.2f} nm)\n"
+    
+    # # Place the system configuration legend in the plot
+    # plt.text(0.02, 0.98, system_legend.strip(), transform=plt.gca().transAxes,
+    #          fontsize=10, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.8))
+    
+    legend = ""
+    for i, (material, thickness) in enumerate(config):
+        if material == "air":
+            continue
+        if material == "glass":
+            legend += f"{material} ({thickness/1000:.2f} mm)\n"
+            continue
+        legend += f"{material} ({thickness*1000:.2f} nm)\n"
+    plt.text(0.85, 0.98, legend.strip(), transform=plt.gca().transAxes,
+         fontsize=10, verticalalignment='top',
+         bbox=dict(facecolor='white', alpha=0.8, pad=3))
+
+    # Combine legends
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    if Irradiance is not False:
+        lines2, labels2 = ax2.get_legend_handles_labels()
+    else:
+        lines2, labels2 = [], []
+    ax1.legend(lines1 + lines2, labels1 + labels2, fontsize=10)
+    
+    if title:
+        ax1.set_title(title)
+    
+    plt.tight_layout()
+    if save:
+        plt.savefig(f"Output/RTA_phi0_d/{title}.png")
+    else:
+        plt.show()
+        
+def plot_optimization_landscape(layers_config, wl, d_ZnS_range, d_Cu_range, Irradiance, phi0=0):
+    """
+    Trace le paysage d'optimisation en 2D avec irradiance.
     """
     # Création du meshgrid
     D_ZnS, D_Cu = np.meshgrid(d_ZnS_range, d_Cu_range)
@@ -346,60 +298,100 @@ def plot_optimization_landscape(layers_config, wl, d_ZnS_range, d_Cu_range, phi0
     # Calcul du score pour chaque combinaison
     for i in range(len(d_ZnS_range)):
         for j in range(len(d_Cu_range)):
-            # Créer le tableau d'épaisseurs dans l'ordre: [ZnS1, Cu, ZnS2]
-            current_thicknesses = [
-                d_ZnS_range[i],  # ZnS1
-                d_Cu_range[j],   # Cu
-                d_ZnS_range[i]   # ZnS2 (même que ZnS1)
-            ]
-            
-            # Calcul du score
-            scores[j,i] = objective_function(current_thicknesses, layers_config, wl, phi0)
+            current_thicknesses = [d_ZnS_range[i], d_Cu_range[j], d_ZnS_range[i]]
+            scores[j,i] = objective_function(current_thicknesses, layers_config, wl, Irradiance, phi0)
+    
+    # Normalisation logarithmique pour meilleure visualisation
+    scores = np.log(scores)
     
     # Plot
     plt.figure(figsize=(12, 8))
     contour = plt.contourf(D_ZnS, D_Cu, scores, levels=50, cmap='viridis')
-    plt.colorbar(contour, label='Score (à minimiser)')
+    
+    # Ajout du point optimal si disponible
+    try:
+        opt_ZnS, opt_Cu, _ = optimize_layer_thicknesses(layers_config, wl, Irradiance, phi0)
+        plt.scatter(opt_ZnS, opt_Cu, c='red', marker='x', s=100, 
+                   label=f'Optimum ({opt_ZnS:.2f} µm, {opt_Cu:.2f} µm)')
+        plt.legend()
+    except Exception as e:
+        print(f"Could not plot optimum: {str(e)}")
+    
+    plt.colorbar(contour, label='Score (log scale)')
     plt.xlabel('Épaisseur ZnS (µm)')
     plt.ylabel('Épaisseur Cu (µm)')
-    plt.title('Paysage d\'optimisation RTA')
+    plt.title('Paysage d\'optimisation (plus bas = mieux)')
     plt.show()
 
 if __name__ == "__main__":
     # Configuration initiale
-    config = [("air", 0), ("ZnS", 20e-3), ("Cu", 30e-3), ("ZnS", 20e-3), ("glass", 0.5)]
+    config = [
+        ("air", 0),
+        ("ZnS", 0.01),
+        ("Cu", 0.01),
+        ("ZnS", 0.01),
+        ("glass", 100)
+    ]
     
-    # Longueurs d'onde
-    wl, _, _, _, _, _ = Extraction.n_k_wl_trilayer("Data/ZnS_Querry.txt", "Data/Cu_Querry.txt", 
-                                                  "Data/ZnS_Querry.txt", "Data/Glass_Palik.txt", 0.2, 20)
+    # Chargement des données
+    wl, _, _, _, _, _ = Extraction.n_k_wl_trilayer(
+        "Data/ZnS_Querry.txt", 
+        "Data/Cu_Querry.txt", 
+        "Data/ZnS_Querry.txt", 
+        "Data/Glass_Palik.txt", 
+        0.2, 20
+    )
+   
+    phi0 = 0.0
+    plot_R_T_A_fixed_phi0_and_d_multilayer(config= config, wl= wl,Irradiance= True, phi0 = phi0, title="RTA with Irradiance_{}°".format(phi0), save=True)
+    phi0 = 28.7
+    plot_R_T_A_fixed_phi0_and_d_multilayer(config= config, wl= wl,Irradiance= True, phi0 = phi0, title="RTA with Irradiance_{}°".format(phi0), save=True)
+
     
-    # Optimisation
-    result = optimize_layer_thicknesses(config, wl)
+    # Chargement de l'irradiance solaire
+    Irradiance = Extraction.solar_interpolation("Data/ASTM1.5Global.txt", wl)
     
-    if result.success:
-        print("Optimisation réussie!")
-        print("Épaisseurs optimisées (µm):", result.x)
+    try:
+        # Optimisation
+        ZnS1_opt, Cu_opt, ZnS2_opt = optimize_layer_thicknesses(config, wl, Irradiance)
         
-        # Mettre à jour la configuration avec les nouvelles épaisseurs
-        optimized_config = config.copy()
-        thickness_idx = 0
-        for i, (material, _) in enumerate(optimized_config):
-            if material != "air":
-                optimized_config[i] = (material, result.x[thickness_idx])
-                thickness_idx += 1
-                
-        # Visualiser les résultats optimisés
-        optical_layers = layers(optimized_config)
-        plot_R_T_A_fixed_phi0_and_d_multilayer(optical_layers, wl, 0, 
-                                             title="Performances optiques après optimisation")
-    else:
-        print("L'optimisation a échoué:", result.message)
+        print(f"Optimisation réussie:")
+        print(f"ZnS1 optimisé: {ZnS1_opt:.3f} µm")
+        print(f"Cu optimisé: {Cu_opt:.3f} µm")
+        print(f"ZnS2 optimisé: {ZnS2_opt:.3f} µm")
+        
+        # Configuration optimisée
+        optimized_config = [
+            ("air", 0),
+            ("ZnS", ZnS1_opt),
+            ("Cu", Cu_opt),
+            ("ZnS", ZnS2_opt),
+            ("glass", 100)
+        ]
+        
+        # Visualisation
 
-
-    
-    # Définir les plages d'épaisseurs à explorer [µm]
-    d_ZnS_range = np.linspace(0.01, 0.1, 30)  # 10nm à 100nm
-    d_Cu_range = np.linspace(0.01, 0.2, 30)   # 10nm à 200nm
-    
-    # Générer le plot
-    plot_optimization_landscape(config, wl, d_ZnS_range, d_Cu_range)
+        plot_R_T_A_fixed_phi0_and_d_multilayer(
+            optimized_config, wl, Irradiance= True, phi0=0,
+            title="Optimized RTA with Irradiance_{}_IR°".format(0), save=True
+        )
+        ZnS1_opt, Cu_opt, ZnS2_opt = optimize_layer_thicknesses(config, wl, Irradiance, phi0=28.7)
+        optimized_config = [
+            ("air", 0),
+            ("ZnS", ZnS1_opt),
+            ("Cu", Cu_opt),
+            ("ZnS", ZnS2_opt),
+            ("glass", 100)
+        ]
+        plot_R_T_A_fixed_phi0_and_d_multilayer(
+            optimized_config, wl, Irradiance= True, phi0=0,
+            title="Optimized RTA with Irradiance_{}_IR_UV°".format(0), save=True
+        )
+        # Paysage d'optimisation
+        # d_ZnS_range = np.linspace(0.01, 0.1, 30)  # 10nm à 100nm
+        # d_Cu_range = np.linspace(0.01, 0.2, 30)   # 10nm à 200nm
+        # plot_optimization_landscape(config, wl, d_ZnS_range, d_Cu_range, Irradiance)
+        
+    except Exception as e:
+        print(f"Erreur: {str(e)}")
+        sys.exit(1)

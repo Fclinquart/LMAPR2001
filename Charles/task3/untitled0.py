@@ -1112,6 +1112,11 @@ if __name__ == "__main__":
             "n_interp": None,
             "k_interp": None,
         },
+        "ZnS":{
+            "file_nk": 'data/ZnS_Querry.txt',
+            "n_interp": None,
+            "k_interp": None,
+        },
         
     
     }
@@ -1123,9 +1128,9 @@ if __name__ == "__main__":
     
     layer_configs = [
         #{"material": "Air", "thickness": 0},
-        {"material": "ZnO", "thickness": 0.02},
-        {"material": "Copper", "thickness": 0.03},
-        {"material": "ZnO", "thickness": 0.02},
+        {"material": "ZnS", "thickness": 0.035},
+        {"material": "Copper", "thickness": 0.025},
+        {"material": "ZnS", "thickness": 0.035},
         {"material": "Glass", "thickness": 0.5},
     ]
     
@@ -1169,35 +1174,35 @@ if __name__ == "__main__":
     thickness_list_dielectric = np.linspace(0.01, 0.1, 20)  # de 10 nm à 100 nm
     
     # Balayage 2D
-    T_map = sweep_multilayer_dzno_daero(
-        metals,
-        lambda_common,
-        n_glass_interp,
-        kappa_glass_interp,
-        thickness_list_aero,
-        thickness_list_dielectric,
-        N_bilayers=10,              # Par exemple 10 bicouches
-        angle_incidence_deg=0,      # Incidence normale
-        lambda_min_band=0.4, 
-        lambda_max_band=0.7
-    )
+    # T_map = sweep_multilayer_dzno_daero(
+    #     metals,
+    #     lambda_common,
+    #     n_glass_interp,
+    #     kappa_glass_interp,
+    #     thickness_list_aero,
+    #     thickness_list_dielectric,
+    #     N_bilayers=10,              # Par exemple 10 bicouches
+    #     angle_incidence_deg=0,      # Incidence normale
+    #     lambda_min_band=0.4, 
+    #     lambda_max_band=0.7
+    # )
     
-    # Tracé de la heatmap
-    plot_map_2D(thickness_list_aero, thickness_list_dielectric, T_map)
+    # # Tracé de la heatmap
+    # plot_map_2D(thickness_list_aero, thickness_list_dielectric, T_map)
 
-    R_map = sweep_multilayer_dzno_daero_reflectivity(
-    metals,
-    lambda_common,
-    n_glass_interp,
-    kappa_glass_interp,
-    thickness_list_aero,
-    thickness_list_dielectric,
-    N_bilayers=10,
-    angle_incidence_deg=0,
-    lambda_min_band=0.7,
-    lambda_max_band=10
-    )
+    # R_map = sweep_multilayer_dzno_daero_reflectivity(
+    # metals,
+    # lambda_common,
+    # n_glass_interp,
+    # kappa_glass_interp,
+    # thickness_list_aero,
+    # thickness_list_dielectric,
+    # N_bilayers=10,
+    # angle_incidence_deg=0,
+    # lambda_min_band=0.7,
+    # lambda_max_band=10
+    # )
 
-    plot_map_2D_reflectivity(thickness_list_aero, thickness_list_dielectric, R_map)
+    # plot_map_2D_reflectivity(thickness_list_aero, thickness_list_dielectric, R_map)
 
 

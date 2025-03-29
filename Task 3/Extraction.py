@@ -92,14 +92,15 @@ def n_k_wl_trilayer(file_path1, file_path2, file_path3, file_path_glass, wl_min,
     wl_glass, n_glass, k_glass = zip(*[(wl, n, k) for wl, n, k in zip(wl_glass, n_glass, k_glass) if wl_min <= wl <= wl_max])
     wl_glass = np.array(wl_glass) 
     
-    n0 = np.ones(len(wl_glass))
-    n1 = np.interp(wl_glass, wl1, n1) - 1j * np.interp(wl_glass, wl1, k1)
-    n2 = np.interp(wl_glass, wl2, n2) - 1j * np.interp(wl_glass, wl2, k2)
-    n3 = np.interp(wl_glass, wl3, n3) - 1j * np.interp(wl_glass, wl3, k3)
-    n_glass = np.array(n_glass) - 1j * np.array(k_glass)
+    wl= np.linspace(wl_min, wl_max, 1000)
+    n0 = np.ones(len(wl))
+    n1 = np.interp(wl, wl1, n1) - 1j * np.interp(wl, wl1, k1)
+    n2 = np.interp(wl, wl2, n2) - 1j * np.interp(wl, wl2, k2)
+    n3 = np.interp(wl, wl3, n3) - 1j * np.interp(wl, wl3, k3)
+    n_glass = np.interp(wl, wl_glass, n_glass) - 1j * np.interp(wl, wl_glass, k_glass)
 
-    print("Task 3 : Extracting refractive indices and extinction coefficients for the trilayer system...")
-    return wl_glass, n0, n1, n2, n3, n_glass
+    
+    return wl, n0, n1, n2, n3, n_glass
 
 def extract_solar_irrandiance(file_path, plot=False):
     """
