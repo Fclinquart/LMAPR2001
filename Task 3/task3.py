@@ -13,33 +13,32 @@ import task2 # type: ignore
 
 
 
-def layers(config, debug=False):
+def layers(config, wl_interp, debug=False):
     """Génère le système multicouche basé sur la configuration donnée."""
     layers = []
-    filename = []
+    filenames = []
+    
+    material_files = {
+        "ZnS": "Data/ZnS_Querry.txt",
+        "Cu": "Data/n_k_copper.txt",
+        "glass": "Data/Glass_Palik.txt",
+        "Ag": "Data/n_k_silver.txt"  # Exemple pour un autre matériau
+    }
+    
     for material, thickness in config:
-        if debug:
-            print("#" * 50)
-            print(f"Material: {material}, Thickness: {thickness}")
-
         if material == "air":
-            layers.append(thickness)
-        elif material == "ZnS":
-            filename.append("Data/ZnS_Querry.txt")
-            layers.append(thickness)
-        elif material == "Cu":
-            filename.append("Data/n_k_copper.txt")
-            layers.append(thickness)
-        elif material == "glass":
-            filename.append("Data/Glass_Palik.txt")
+            continue
+        if material in material_files:
+            filenames.append(material_files[material])
             layers.append(thickness)
         else:
             raise ValueError(f"Unknown material {material}")
     
-    wl, n0, n1, n2, n3, n_glass = Extraction.n_k_wl_trilayer(filename[0], filename[1], filename[2], filename[3], 0.2, 20)
-    if debug:
-        print(layers)
-    return [ (np.real(n1), -np.imag(n1),layers[1]), (np.real(n2), -np.imag(n2),layers[2]), (np.real(n3), -np.imag(n3),layers[3]), (np.real(n_glass), -np.imag(n_glass),layers[4])]
+    extracted_data = [Extraction.extract_wl_n_k(file) for file in filenames]
+    interpolated_data = [Extraction.interpolate(wl_interp, *data) for data in extracted_data]
+    
+    layer_tuples = [(n_interp, k_interp, layers[i]) for i, (n_interp, k_interp) in enumerate(interpolated_data)]
+    return layer_tuples
 
 def calculate_RTA_multilayer(layers, wl, phi0=0):
     """
@@ -221,7 +220,7 @@ def plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, Irradiance = False, phi0=
         If True, saves the plot as an image file.
 
     """
-    l = layers(config)
+    l = layers(config, wl)
     R, T, A = calculate_RTA_multilayer(l, wl, phi0)
 
     fig, ax1 = plt.subplots(figsize=(12, 6))
@@ -323,6 +322,18 @@ def plot_optimization_landscape(layers_config, wl, d_ZnS_range, d_Cu_range, Irra
     plt.title('Paysage d\'optimisation (plus bas = mieux)')
     plt.show()
 
+def comparaison(config1, config2, config3, wl, phi0 = 0, debug = False):
+    """
+    Compare the performance of three distinct configurations : "
+    "1. the 3-layers "
+    "2. the system with simple metal "
+    "3. the bare glass"
+    """
+
+    R, T, A = calculate_RTA_multilayer(layers(config1), wl, phi0)
+    R_metal, T_metal, A_metal = calculate_RTA_multilayer(layers(config2), wl, phi0)
+
+
 if __name__ == "__main__":
     # Configuration initiale
     config = [
@@ -330,16 +341,16 @@ if __name__ == "__main__":
         ("ZnS", 0.01),
         ("Cu", 0.01),
         ("ZnS", 0.01),
-        ("glass", 100)
+        ("glass", 0.5)
+        
     ]
-    
-    # Chargement des données
-    wl, _, _, _, _, _ = Extraction.n_k_wl_trilayer(
-        "Data/ZnS_Querry.txt", 
-        "Data/Cu_Querry.txt", 
-        "Data/ZnS_Querry.txt", 
-        "Data/Glass_Palik.txt", 
-        0.2, 20
-    )
-   
+
+    wl = np.linspace(0.2, 20, 1000)  
+
+    l = layers(config,wl) 
+
+    plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, Irradiance = False, phi0=0, title="Initial Configuration", save=False)
+
+
+
     

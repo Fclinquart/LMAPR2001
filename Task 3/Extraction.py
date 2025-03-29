@@ -23,7 +23,9 @@ def extract_wl_n_k(file_path):
     wl = []  # Wavelength
     n = []   # Refractive index
     k = []   # Extinction coefficient
-
+    if file_path == "Data/Glass_Palik.txt":
+        wl, n, k = task2.n_k(file_path)
+        return wl, n, k
     with open(file_path, 'r') as file:
         lines = file.readlines()
 
@@ -62,6 +64,9 @@ def extract_wl_n_k(file_path):
                     # Ensure the wl values match between n and k sections
                     if len(wl) > len(k):
                         k.append(float(parts[1]))
+
+
+        
 
     return wl, n, k
 
@@ -153,3 +158,22 @@ def solar_interpolation(file_path, wl):
     wl_solar, solar_irradiance = extract_solar_irrandiance(file_path)
     solar_irradiance_interp = np.interp(wl, wl_solar, solar_irradiance)
     return solar_irradiance_interp
+
+def interpolate(wl_interp, wl, n, k):
+    """
+    Interpolate the refractive index and extinction coefficient to match the wavelength range.
+
+    Parameters:
+    wl (numpy.ndarray): Wavelength range of the trilayer system.
+    n (numpy.ndarray): Refractive index values.
+    k (numpy.ndarray): Extinction coefficient values.
+
+    Returns:
+    tuple: A tuple containing:
+        - n_interp (numpy.ndarray): Interpolated refractive index values.
+        - k_interp (numpy.ndarray): Interpolated extinction coefficient values.
+    """
+    n_interp = np.interp(wl_interp, wl, n)
+    k_interp = np.interp(wl_interp, wl, k)
+    return n_interp, k_interp
+
