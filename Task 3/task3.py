@@ -22,7 +22,7 @@ def layers(config, wl_interp, debug=False):
         "ZnS": "Data/ZnS_Querry.txt",
         "Cu": "Data/n_k_copper.txt",
         "glass": "Data/Glass_Palik.txt",
-        "Ag": "Data/n_k_silver.txt"  # Exemple pour un autre matériau
+        "Ag": "Data/Ag_Hagemann.txt"  # Exemple pour un autre matériau
     }
     
     for material, thickness in config:
@@ -322,7 +322,7 @@ def plot_optimization_landscape(layers_config, wl, d_ZnS_range, d_Cu_range, Irra
     plt.title('Paysage d\'optimisation (plus bas = mieux)')
     plt.show()
 
-def comparaison(config1, config2, config3, wl, phi0 = 0, debug = False):
+def comparaison(config1, config2, config3, wl, Irrandiance = False,  phi0 = 0, title = "",  save = False, debug = False):
     """
     Compare the performance of three distinct configurations : "
     "1. the 3-layers "
@@ -330,8 +330,65 @@ def comparaison(config1, config2, config3, wl, phi0 = 0, debug = False):
     "3. the bare glass"
     """
 
-    R, T, A = calculate_RTA_multilayer(layers(config1), wl, phi0)
-    R_metal, T_metal, A_metal = calculate_RTA_multilayer(layers(config2), wl, phi0)
+    R_multi, T_multi, A_multi = calculate_RTA_multilayer(layers(config1,wl), wl, phi0)
+    R_metal, T_metal, A_metal = calculate_RTA_multilayer(layers(config2,wl), wl, phi0)
+    R_glass, T_glass, A_glass = calculate_RTA_multilayer(layers(config3,wl), wl, phi0)
+
+    if Irrandiance:
+        I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt", wl)
+    
+    fig, axs = plt.subplots(3, 1, figsize=(10, 18), sharex=True)
+    
+    axs[0].plot(wl, R_multi, label="Multilayer", color='blue')
+    axs[0].plot(wl, R_metal, label="Metallic layer", color='red')
+    axs[0].plot(wl, R_glass, label="Bare Glass", color='green')
+    axs[0].axvspan(0.4, 0.7, color="yellow", alpha=0.05)
+    axs[0].axvspan(0.2, 0.4, color="purple", alpha=0.05)
+    axs[0].axvspan(0.7, 20, color="red", alpha=0.05)
+    axs[0].legend(loc = "upper right", fontsize = 10)
+    if Irrandiance:
+        ax0 = axs[0].twinx()
+        ax0.plot(wl, I, label="Irradiance", color='orange', alpha=0.5)
+        ax0.set_ylabel("Irradiance (W/m²/µm)")
+        
+        ax1 = axs[1].twinx()
+        ax1.plot(wl, I, label="Irradiance", color='orange', alpha=0.5)
+        ax1.set_ylabel("Irradiance (W/m²/µm)")
+        
+        ax2 = axs[2].twinx()
+        ax2.plot(wl, I, label="Irradiance", color='orange', alpha=0.5)
+        ax2.set_ylabel("Irradiance (W/m²/µm)")
+        
+    axs[0].set_ylabel("R")
+    axs[0].set_title("Reflectance")
+    axs[0].set_xscale('log')
+    axs[1].plot(wl, T_multi, label="Multilayer", color='blue')
+    axs[1].plot(wl, T_metal, label="Metallic layer", color='red')
+    axs[1].plot(wl, T_glass, label="Bare Glass", color='green')
+    axs[1].set_ylabel("T")
+    
+    axs[1].set_title("Transmissivity")
+    axs[1].set_xscale('log')
+    axs[1].axvspan(0.4, 0.7, color="yellow", alpha=0.05, label="Visible")
+    axs[1].axvspan(0.2, 0.4, color="purple", alpha=0.05, label="UV")
+    axs[1].axvspan(0.7, 20, color="red", alpha=0.05, label="IR")
+  
+    axs[2].plot(wl, A_multi, label="Multilayer", color='blue')
+    axs[2].plot(wl, A_metal, label="Metallic layer", color='red')
+    axs[2].plot(wl, A_glass, label="Bare Glass", color='green')
+    axs[2].set_ylabel("A")
+    axs[2].set_title("Absorbance")
+    axs[2].set_xscale('log')
+    axs[2].set_xlabel("Wavelength (µm)")
+    axs[2].axvspan(0.4, 0.7, color="yellow", alpha=0.05, label="Visible")
+    axs[2].axvspan(0.2, 0.4, color="purple", alpha=0.05, label="UV")
+    axs[2].axvspan(0.7, 20, color="red", alpha=0.05, label="IR")
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    if save:
+        plt.savefig("Output/Comparison/{}.png".format(title))
+    else:
+        plt.show()
 
 
 if __name__ == "__main__":
@@ -347,9 +404,25 @@ if __name__ == "__main__":
 
     wl = np.linspace(0.2, 20, 1000)  
 
-    l = layers(config,wl) 
+    config_metal = [
+        ("air", 0),
+        ("Ag", 0.09),
+        ("glass", 0.5)
+    ]
 
-    plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, Irradiance = False, phi0=0, title="Initial Configuration", save=False)
+    config_glass = [
+        ("air", 0),
+        ("glass", 0.5)
+    ]
+
+    config_copper = [
+        ("air", 0),
+        ("Cu", 0.01),
+        ("glass", 0.5)
+    ]
+    
+    comparaison(config, config_metal, config_glass, wl,Irrandiance= True, title="Comparison for Silver", save=True)
+    comparaison(config, config_copper, config_glass, wl,Irrandiance= True, title="Comparison for Copper", save=True)
 
 
 
