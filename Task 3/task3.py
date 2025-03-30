@@ -145,7 +145,7 @@ def objective_function(thicknesses, layers_config, wl, Irradiance, phi0=0, Spect
             thickness_idx += 1
     
     # Calcul des propriétés optiques
-    optical_layers = layers(updated_config)
+    optical_layers = layers(updated_config,wl)
     R, T, A = calculate_RTA_multilayer(optical_layers, wl, phi0)
     
     # Calcul du score pondéré par l'irradiance
@@ -305,7 +305,7 @@ def plot_optimization_landscape(layers_config, wl, d_ZnS_range, d_Cu_range, Irra
     
     # Plot
     plt.figure(figsize=(12, 8))
-    contour = plt.contourf(D_ZnS, D_Cu, scores, levels=50, cmap='viridis')
+    contour = plt.contourf(D_ZnS, D_Cu, scores, levels=50, cmap='plasma')
     
     # Ajout du point optimal si disponible
     try:
@@ -317,9 +317,10 @@ def plot_optimization_landscape(layers_config, wl, d_ZnS_range, d_Cu_range, Irra
         print(f"Could not plot optimum: {str(e)}")
     
     plt.colorbar(contour, label='Score (log scale)')
-    plt.xlabel('Épaisseur ZnS (µm)')
-    plt.ylabel('Épaisseur Cu (µm)')
-    plt.title('Paysage d\'optimisation (plus bas = mieux)')
+    plt.xlabel('Thickness ZnS (µm)')
+    plt.ylabel('Thickness Cu (µm)')
+    plt.title('Optimal Thickness Landscape')
+    plt.savefig("Output/Optimization_Landscape_500.png")
     plt.show()
 
 def comparaison(config1, config2, config3, wl, Irrandiance = False,  phi0 = 0, title = "",  save = False, debug = False):
@@ -390,6 +391,152 @@ def comparaison(config1, config2, config3, wl, Irrandiance = False,  phi0 = 0, t
     else:
         plt.show()
 
+def power_from_the_sun(wl, Irradiance):
+    """
+    Calculate the energy from the sun for a given wavelength range and solar irradiance.
+    
+    Parameters:
+    wl : array-like
+        Wavelengths in micrometers.
+    Irradiance : array-like
+        Solar irradiance data corresponding to wavelengths.
+    
+    Returns:
+    float : Energy from the sun in Joules.
+    """
+    
+    
+    # Calculate energy from the sun
+    energy = np.trapz(Irradiance, wl)
+    
+    return energy
+
+def power_reflected_and_transmitted_absorbed(wl, Irradiance, R, T):
+    """
+    Calculate the power reflected and transmitted for a given wavelength range and solar irradiance.
+    
+    Parameters:
+    wl : array-like
+        Wavelengths in micrometers.
+    Irradiance : array-like
+        Solar irradiance data corresponding to wavelengths.
+    R : array-like
+        Reflectivity values for each wavelength.
+    T : array-like"
+    "    Transmissivity values for each wavelength."
+    """ 
+    # Calculate power reflected and transmitted
+    power_reflected = np.trapz(Irradiance * R, wl)
+    power_transmitted = np.trapz(Irradiance * T, wl)
+    power_absorbed = np.trapz(Irradiance * (1 - R - T), wl)
+    
+    return power_reflected, power_transmitted, power_absorbed
+
+def power_save(wl, Irradiance, R, T, A, debug=False):
+    """
+    Calculate the power saved for a given wavelength range and solar irradiance.
+    
+    Parameters:
+    wl : array-like
+        Wavelengths in micrometers.
+    Irradiance : array-like
+        Solar irradiance data corresponding to wavelengths.
+    R : array-like
+        Reflectivity values for each wavelength.
+    T : array-like
+        Transmissivity values for each wavelength.
+    A : array-like
+        Absorbance values for each wavelength.
+    debug : bool, optional
+        If True, prints debug information.
+    
+    Returns:
+    float : Power saved in Watt.
+    """
+    power_r, power_t, power_a = power_reflected_and_transmitted_absorbed(wl, Irradiance, R, T)
+    power_sun = power_from_the_sun(wl, Irradiance)
+    if debug:
+        print(("#" * 20) + "Debug Information : power_save" + ("#" * 20))
+        print(f"Power from the sun: {power_sun} W")
+        print(f"Power reflected: {power_r} W")
+        print(f"Power transmitted: {power_t} W")
+        print(f"Power absorbed: {power_a} W")
+        print("L'énergie transmisse et l'énergie absorbé rechauffe la piece car l'énergie absorbée par la vitre est thermalisé")
+        print("#" * 60)
+    return power_r
+
+def optimize_layer_thicknesses_10l(layers_config, wl, Irradiance, phi0=0, bounds=None, Spectrum_UV_IR=False):
+    """
+    Optimizes the thicknesses of aerogel (air) and dielectric (ZnS) layers in a multilayer system.
+    """
+    variable_layers = [thickness for material, thickness in layers_config if material not in ("air", "glass")]
+    
+    if bounds is None:
+        bounds = [(0.001, 5000) for _ in variable_layers]  # Thickness in µm
+    
+    def wrapped_objective(thicknesses):
+        updated_config = []
+        index = 0
+        for material, thickness in layers_config:
+            if material in ("air", "glass"):
+                updated_config.append((material, thickness))
+            else:
+                updated_config.append((material, thicknesses[index]))
+                index += 1
+        return objective_function(updated_config, wl, Irradiance, phi0)
+    
+    result = opt.minimize(
+        wrapped_objective,
+        variable_layers,
+        bounds=bounds,
+        method='L-BFGS-B',
+        options={'maxiter': 100, 'disp': True}
+    )
+    
+    if result.success:
+        return result.x  # Returns optimized thickness array
+    else:
+        raise RuntimeError(f"Optimization failed: {result.message}")
+
+def plot_optimization_landscape_10l(layers_config, wl, d_air_range, d_ZnS_range, Irradiance, phi0=0):
+    """
+    Plots the optimization landscape for a 10-layer aerogel (air) / ZnS stack.
+    """
+    D_Air, D_ZnS = np.meshgrid(d_air_range, d_ZnS_range)
+    scores = np.zeros_like(D_Air)
+    
+    for i in range(len(d_air_range)):
+        for j in range(len(d_ZnS_range)):
+            current_thicknesses = []
+            for k in range(10):  # 10 alternating layers
+                current_thicknesses.append(d_air_range[i])  # Air (Aerogel)
+                current_thicknesses.append(d_ZnS_range[j])  # ZnS (Dielectric)
+            current_thicknesses.append(0.5)  # Glass thickness
+            
+            scores[j, i] = objective_function(current_thicknesses, layers_config, wl, Irradiance, phi0)
+    
+    scores = np.log1p(scores)
+    
+    plt.figure(figsize=(12, 8))
+    contour = plt.contourf(D_ZnS, D_Air, scores, levels=50, cmap='plasma')
+    
+    try:
+        opt_thicknesses = optimize_layer_thicknesses_10l(layers_config, wl, Irradiance, phi0)
+        opt_Air = opt_thicknesses[::2]  # Extract optimized air layers
+        opt_ZnS = opt_thicknesses[1::2]  # Extract optimized ZnS layers
+        plt.scatter(np.mean(opt_Air), np.mean(opt_ZnS), c='red', marker='x', s=100, 
+                   label=f'Optimum (Air: {np.mean(opt_Air):.2f} µm, ZnS: {np.mean(opt_ZnS):.2f} µm)')
+        plt.legend()
+    except Exception as e:
+        print(f"Could not plot optimum: {str(e)}")
+    
+    plt.colorbar(contour, label='Score (log scale)')
+    plt.xlabel('Aerogel Thickness (µm)')
+    plt.ylabel('ZnS Thickness (µm)')
+    plt.title('Optimization Landscape of 10-Layer Aerogel/ZnS System', fontsize =12)
+    plt.savefig("Output/Aerogel/Optimization_Landscape_Air_ZnS_{}.png".format(len(d_air_range)))
+    plt.show()
+
 
 if __name__ == "__main__":
     # Configuration initiale
@@ -403,6 +550,7 @@ if __name__ == "__main__":
     ]
 
     wl = np.linspace(0.2, 20, 1000)  
+    I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt", wl)
 
     config_metal = [
         ("air", 0),
@@ -420,10 +568,38 @@ if __name__ == "__main__":
         ("Cu", 0.01),
         ("glass", 0.5)
     ]
+
+    power_saving_information= False
+
+    if power_saving_information :
+        R, T, A = calculate_RTA_multilayer(layers(config, wl), wl)
+        P = power_save(wl, I, R, T, A, False)
+        print("The power saved in the case of the multilayer system  is :", P, " w")
+
+        R_glass, T_glass, A_glass = calculate_RTA_multilayer(layers(config_glass, wl), wl)
+        P_glass = power_save(wl, I, R_glass, T_glass, A_glass, False)
+        print("The power saved by the bare glass is :", P_glass, " w")
+
+        R_metal, T_metal, A_metal = calculate_RTA_multilayer(layers(config_metal, wl), wl)
+        P_metal = power_save(wl, I, R_metal, T_metal, A_metal, False)
+        print("The power saved by the silver layer is :", P_metal, " w")
+
+        R_copper, T_copper, A_copper = calculate_RTA_multilayer(layers(config_copper, wl), wl)
+        P_copper = power_save(wl, I, R_copper, T_copper, A_copper, False)
+        print("The power saved by the copper layer is :", P_copper, " w")
     
-    comparaison(config, config_metal, config_glass, wl,Irrandiance= True, title="Comparison for Silver", save=True)
-    comparaison(config, config_copper, config_glass, wl,Irrandiance= True, title="Comparison for Copper", save=True)
 
+    #plot_optimization_landscape(config, wl, np.linspace(0.001, 0.5, 300), np.linspace(0.001, 0.5, 300), I, phi0=0)
 
+    #10 bilayer of ZnS/Air 
 
+    config = [
+        ("air", 0),
+        ("ZnS", 0.01),
+        ("air", 0.01),
+        ("glass", 0.5)
+    ]
+    d = np.linspace(0.05, 0.15, 130)
+    plot_optimization_landscape_10l(config, wl, d,d, I, phi0=0)
     
+        
