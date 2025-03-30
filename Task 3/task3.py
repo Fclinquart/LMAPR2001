@@ -320,7 +320,7 @@ def plot_optimization_landscape(layers_config, wl, d_ZnS_range, d_Cu_range, Irra
     plt.xlabel('Thickness ZnS (µm)')
     plt.ylabel('Thickness Cu (µm)')
     plt.title('Optimal Thickness Landscape')
-    plt.savefig("Output/Optimization_Landscape_500.png")
+    plt.savefig("Output/Optimal_thickness/Optimization_Landscape_{}.png".format(len(d_ZnS_range)))
     plt.show()
 
 def comparaison(config1, config2, config3, wl, Irrandiance = False,  phi0 = 0, title = "",  save = False, debug = False):
@@ -570,6 +570,7 @@ if __name__ == "__main__":
     ]
 
     power_saving_information= False
+    aerogel = False 
 
     if power_saving_information :
         R, T, A = calculate_RTA_multilayer(layers(config, wl), wl)
@@ -588,18 +589,25 @@ if __name__ == "__main__":
         P_copper = power_save(wl, I, R_copper, T_copper, A_copper, False)
         print("The power saved by the copper layer is :", P_copper, " w")
     
-
-    #plot_optimization_landscape(config, wl, np.linspace(0.001, 0.5, 300), np.linspace(0.001, 0.5, 300), I, phi0=0)
+    d = np.linspace(0.001, 0.04, 50)
+    plot_optimization_landscape(config, wl,d,d, I, phi0=0)
 
     #10 bilayer of ZnS/Air 
-
-    config = [
-        ("air", 0),
-        ("ZnS", 0.01),
-        ("air", 0.01),
-        ("glass", 0.5)
-    ]
-    d = np.linspace(0.05, 0.15, 130)
-    plot_optimization_landscape_10l(config, wl, d,d, I, phi0=0)
+    if aerogel:
+        config = [
+            ("air", 0),
+            ("ZnS", 0.01),
+            ("air", 0.01),
+            ("ZnS", 0.01),
+            ("air", 0.01),
+            ("ZnS", 0.01),
+            ("air", 0.01),
+            ("ZnS", 0.01),
+            ("air", 0.01),
+            ("glass", 0.5)
+        ]
+        d = np.linspace(0.001, 1, 250)
+        plot_optimization_landscape_10l(config, wl, d,d, I, phi0=0)
+    
     
         
