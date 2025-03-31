@@ -171,9 +171,65 @@ def interpolate(wl_interp, wl, n, k):
     Returns:
     tuple: A tuple containing:
         - n_interp (numpy.ndarray): Interpolated refractive index values.
-        - k_interp (numpy.ndarray): Interpolated extinction coefficient values.
+   
+    Args:
+        file_path (str): Chemin vers le fichier .txt contenant les données
+    
+    Returns:        - k_interp (numpy.ndarray): Interpolated extinction coefficient values.
     """
     n_interp = np.interp(wl_interp, wl, n)
     k_interp = np.interp(wl_interp, wl, k)
     return n_interp, k_interp
 
+def extract_spectral_data(file_path, phi0 = 45):
+    """
+    Extrait les données spectrales d'un fichier texte ellipsométrique
+ 
+        tuple: (wl, Psi, Delta) où:
+            - wl: liste des longueurs d'onde en nm
+            - Psi: liste des angles Psi en degrés
+            - Delta: liste des angles Delta en degrés
+    """
+    wl = []
+    Psi = []
+    Delta = []
+    
+    encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
+    
+    for encoding in encodings:
+        try:
+            with open(file_path, 'r', encoding=encoding) as file:
+                lines = file.readlines()
+                
+                # Recherche du début des données
+                data_start = False
+                for line in lines:
+                    if "# DATA:" in line:
+                        data_start = True
+                        continue
+                    
+                    if data_start and line.strip() and not line.startswith('#'):
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            try:
+                                wl.append(float(parts[0]))
+                                Psi.append(float(parts[1]))
+                                Delta.append(float(parts[2]))
+                            except (ValueError, IndexError):
+                                continue
+                    
+                
+                if wl:  # Si on a trouvé des données, on sort
+                    break
+                
+                    
+        except UnicodeDecodeError:
+            continue
+        
+       
+            
+            
+    return wl[:-2], Psi[:-2], Delta[:-2]
+
+wl, Psi, Delta = extract_spectral_data("Data/FRANCOIS_45.txt")
+print(wl)

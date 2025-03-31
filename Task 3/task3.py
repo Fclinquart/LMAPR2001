@@ -40,7 +40,7 @@ def layers(config, wl_interp, debug=False):
     layer_tuples = [(n_interp, k_interp, layers[i]) for i, (n_interp, k_interp) in enumerate(interpolated_data)]
     return layer_tuples
 
-def calculate_RTA_multilayer(layers, wl, phi0=0):
+def calculate_RTA_multilayer(layers, wl, phi0=0, ellipsometry=False):
     """
     Calculate Reflectivity, Transmissivity, and Absorbance for a multi-layered system.
     
@@ -126,6 +126,11 @@ def calculate_RTA_multilayer(layers, wl, phi0=0):
     R = (R_p + R_s) / 2
     T = (T_p_corrected + T_s_corrected) / 2
     A = 1 - R - T
+
+    
+    if ellipsometry:
+        rho = (S_p[1, 0, :] / S_p[0, 0, :]) / (S_s[1, 0, :] / S_s[0, 0, :])
+        return rho
 
     return R, T, A
 
@@ -537,7 +542,97 @@ def plot_optimization_landscape_10l(layers_config, wl, d_air_range, d_ZnS_range,
     plt.savefig("Output/Aerogel/Optimization_Landscape_Air_ZnS_{}.png".format(len(d_air_range)))
     plt.show()
 
+def plot_ellipsometry(save=True, config=None):
+    """
+    Plot the ellipsometry data from a file and interpolate Psi and Delta values for 1000 points of wavelength.
+    
+    Parameters:
+    save : bool
+        If True, save the plots as images.
+    config : list
+        Configuration of the multilayer system.
+    
+    Returns:
+    wl_interp : array-like
+        Interpolated wavelengths in nm.
+    Psi_interp : array-like
+        Interpolated Psi values in degrees.
+    Delta_interp : array-like
+        Interpolated Delta values in degrees.
+    """
+    
+    wl, Psi, Delta = Extraction.extract_spectral_data("Data/FRANCOIS_45.txt")
+    wl65, Psi65, Delta65 = Extraction.extract_spectral_data("Data/FRANCOIS_65.txt")
 
+    # Interpolation for 1000 points
+    wl_interp = np.linspace(min(wl), max(wl), 1000)
+    Psi_interp = np.interp(wl_interp, wl, Psi)
+    Delta_interp = np.interp(wl_interp, wl, Delta)
+    Psi65_interp = np.interp(wl_interp, wl65, Psi65)
+    Delta65_interp = np.interp(wl_interp, wl65, Delta65)
+
+    if config is not None:
+        Psi_theory, Delta_theory = Psi_Delta_theory(config, wl_interp, phi0=45)
+        Psi_theory65, Delta_theory65 = Psi_Delta_theory(config, wl_interp, phi0=65)
+
+    # 2 subplots side by side: wl vs Psi and wl vs Delta
+    fig, axs = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
+    
+    axs[0].plot(wl_interp, Psi_interp, label=r"$\Psi$ (45°)")
+    axs[0].plot(wl_interp, Psi65_interp, label=r"$\Psi$ (65°)")
+    if config is not None:
+        axs[0].plot(wl_interp, Psi_theory, label=r"$\Psi$ (theory 45°)", linestyle='--')
+        axs[0].plot(wl_interp, Psi_theory65, label=r"$\Psi$ (theory 65°)", linestyle='--')
+    axs[0].set_xlabel("Wavelength (nm)")
+    axs[0].set_ylabel(r"$\Psi$ (°)")
+    axs[0].set_xscale('log')
+    axs[0].legend(loc='upper right')
+    axs[0].set_title(r"$\Psi$ vs Wavelength")
+    axs[0].grid(True)
+
+    axs[1].plot(wl_interp, Delta_interp, label=r"$\Delta$ (45°)")
+    axs[1].plot(wl_interp, Delta65_interp, label=r"$\Delta$ (65°)")
+    if config is not None:
+        axs[1].plot(wl_interp, Delta_theory, label=r"$\Delta$ (theory 45°)", linestyle='--')
+        axs[1].plot(wl_interp, Delta_theory65, label=r"$\Delta$ (theory 65°)", linestyle='--')
+    axs[1].set_xlabel("Wavelength (nm)")
+    axs[1].set_ylabel(r"$\Delta$ (°)")
+    axs[1].set_xscale('log')
+    axs[1].legend(loc='upper right')
+    axs[1].set_title(r"$\Delta$ vs Wavelength")
+    axs[1].grid(True)
+    
+    plt.tight_layout()
+
+    if save:
+        plt.savefig("Output/Ellipsometry/ellipsometry.png")
+    else:
+        plt.show()
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(Delta_interp, Psi_interp, label=r"$\Psi$ (45°)")
+    plt.plot(Delta65_interp, Psi65_interp, label=r"$\Psi$ (65°)")
+    if config is not None:
+        plt.plot(Delta_theory, Psi_theory, label=r"$\Psi$ (theory 45°)", linestyle='--')
+        plt.plot(Delta_theory65, Psi_theory65, label=r"$\Psi$ (theory 65°)", linestyle='--')
+    plt.xlabel(r"$\Delta$ (°)")
+    plt.ylabel(r"$\Psi$ (°)")
+    plt.grid(True)
+    plt.title(r"$\Psi$ vs $\Delta$")
+    if save:
+        plt.savefig("Output/Ellipsometry/ellipsometry_Psi_Delta.png")
+    else:
+        plt.show()
+
+    return wl_interp, Psi_interp, Delta_interp
+
+def Psi_Delta_theory(config, wl, phi0):
+    rho = calculate_RTA_multilayer(layers(config, wl), wl, phi0=phi0, ellipsometry=True)
+    psi = np.arctan(np.abs(rho))
+    delta = np.angle(rho)
+    return np.degrees(psi), np.degrees(delta)
+
+    return 
 if __name__ == "__main__":
     # Configuration initiale
     config = [
@@ -568,10 +663,28 @@ if __name__ == "__main__":
         ("Cu", 0.01),
         ("glass", 0.5)
     ]
+    config_aero = [
+            ("air", 0),
+            ("ZnS", 0.01),
+            ("air", 0.01),
+            ("ZnS", 0.01),
+            ("air", 0.01),
+            ("ZnS", 0.01),
+            ("air", 0.01),
+            ("ZnS", 0.01),
+            ("air", 0.01),
+            ("glass", 0.5)
+        ]
 
     power_saving_information= False
     aerogel = False 
+    optim_d = False
 
+    plot_ellipsometry(save = False, config = config)
+   
+
+
+    
     if power_saving_information :
         R, T, A = calculate_RTA_multilayer(layers(config, wl), wl)
         P = power_save(wl, I, R, T, A, False)
@@ -590,10 +703,14 @@ if __name__ == "__main__":
         print("The power saved by the copper layer is :", P_copper, " w")
     
     d = np.linspace(0.001, 0.04, 50)
-    plot_optimization_landscape(config, wl,d,d, I, phi0=0)
+
+    if optim_d : 
+        print("Optimizing the thicknesses of the multilayer system")
+        plot_optimization_landscape(config, wl,d,d, I, phi0=0)
 
     #10 bilayer of ZnS/Air 
     if aerogel:
+        print("Optimizing the thicknesses of the aerogel system")
         config = [
             ("air", 0),
             ("ZnS", 0.01),
