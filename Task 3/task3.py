@@ -17,18 +17,25 @@ def layers(config, wl_interp, debug=False):
     """Génère le système multicouche basé sur la configuration donnée."""
     layers = []
     filenames = []
+    n_values = []
+    k_values = []
     
     material_files = {
         "ZnS": "Data/ZnS_Querry.txt",
         "Cu": "Data/n_k_copper.txt",
         "glass": "Data/Glass_Palik.txt",
-        "Ag": "Data/Ag_Hagemann.txt"  # Exemple pour un autre matériau
+        "Ag": "Data/Ag_Hagemann.txt"
     }
     
     for material, thickness in config:
         if material == "air":
             continue
-        if material in material_files:
+        elif material == "aerogel":
+            # Cas spécial : Aerogel -> n = 1, k = 0 pour toutes les longueurs d'onde
+            n_values.append(np.ones_like(wl_interp))  # n = 1
+            k_values.append(np.zeros_like(wl_interp))  # k = 0
+            layers.append(thickness)  # Ajout de l'épaisseur de l'aerogel
+        elif material in material_files:
             filenames.append(material_files[material])
             layers.append(thickness)
         else:
@@ -37,7 +44,13 @@ def layers(config, wl_interp, debug=False):
     extracted_data = [Extraction.extract_wl_n_k(file) for file in filenames]
     interpolated_data = [Extraction.interpolate(wl_interp, *data) for data in extracted_data]
     
-    layer_tuples = [(n_interp, k_interp, layers[i]) for i, (n_interp, k_interp) in enumerate(interpolated_data)]
+    # Ajout des matériaux standards aux listes n_values et k_values
+    for n_interp, k_interp in interpolated_data:
+        n_values.append(n_interp)
+        k_values.append(k_interp)
+    
+    layer_tuples = [(n_values[i], k_values[i], layers[i]) for i in range(len(layers))]
+    
     return layer_tuples
 
 def calculate_RTA_multilayer(layers, wl, phi0=0, ellipsometry=False):
@@ -166,6 +179,7 @@ def objective_function(thicknesses, layers_config, wl, Irradiance, phi0=0, Spect
     
     # Score à minimiser (on veut maximiser T dans le visible et R ailleurs)
     score = 1/(T_integrated * R_integrated + 1e-10)  # +1e-10 pour éviter division par zéro
+    
     
     return score
 
@@ -470,76 +484,126 @@ def power_save(wl, Irradiance, R, T, A, debug=False):
         print("#" * 60)
     return power_r
 
-def optimize_layer_thicknesses_10l(layers_config, wl, Irradiance, phi0=0, bounds=None, Spectrum_UV_IR=False):
+def create_aerogel_dielectric_multilayer(num_bilayers, zns_thickness, aerogel_thickness):
     """
-    Optimizes the thicknesses of aerogel (air) and dielectric (ZnS) layers in a multilayer system.
+    Create a multilayer system with alternating layers of ZnS and aerogel (approximated as air).
+    
+    Parameters:
+    num_bilayers: int, number of bilayers (each bilayer consists of one ZnS layer and one aerogel layer).
+    zns_thickness: float, thickness of each ZnS layer in micrometers.
+    aerogel_thickness: float, thickness of each aerogel layer in micrometers.
+    
+    Returns:
+    list of tuples: configurations of the layers for the multilayer system in the format (material, thickness).
     """
-    variable_layers = [thickness for material, thickness in layers_config if material not in ("air", "glass")]
+    layer_configs = []
     
-    if bounds is None:
-        bounds = [(0.001, 5000) for _ in variable_layers]  # Thickness in µm
+    for _ in range(num_bilayers):
+        # Add ZnS layer
+        layer_configs.append(("ZnS", zns_thickness))
+        # Add aerogel layer
+        layer_configs.append(("aerogel", aerogel_thickness))
     
-    def wrapped_objective(thicknesses):
-        updated_config = []
-        index = 0
-        for material, thickness in layers_config:
-            if material in ("air", "glass"):
-                updated_config.append((material, thickness))
-            else:
-                updated_config.append((material, thicknesses[index]))
-                index += 1
-        return objective_function(updated_config, wl, Irradiance, phi0)
+    # Add a glass substrate at the end
+    layer_configs.append(("glass", 0.5))  # 0.5 µm thickness for glass
     
-    result = opt.minimize(
-        wrapped_objective,
-        variable_layers,
-        bounds=bounds,
-        method='L-BFGS-B',
-        options={'maxiter': 100, 'disp': True}
-    )
-    
-    if result.success:
-        return result.x  # Returns optimized thickness array
-    else:
-        raise RuntimeError(f"Optimization failed: {result.message}")
+    return layer_configs
 
-def plot_optimization_landscape_10l(layers_config, wl, d_air_range, d_ZnS_range, Irradiance, phi0=0):
+def explore_multilayer_performance(wl, num_bilayers=10):
     """
-    Plots the optimization landscape for a 10-layer aerogel (air) / ZnS stack.
-    """
-    D_Air, D_ZnS = np.meshgrid(d_air_range, d_ZnS_range)
-    scores = np.zeros_like(D_Air)
+    Explore the performance of a multilayer system with alternating ZnS and aerogel layers.
+    Generates 2D heatmaps for:
+        - Transmissivity in the visible range
+        - Reflectivity in the infrared range
+        - Reflectivity in the ultraviolet range
+        - Element-wise product of visible transmissivity and infrared reflectivity
     
-    for i in range(len(d_air_range)):
-        for j in range(len(d_ZnS_range)):
-            current_thicknesses = []
-            for k in range(10):  # 10 alternating layers
-                current_thicknesses.append(d_air_range[i])  # Air (Aerogel)
-                current_thicknesses.append(d_ZnS_range[j])  # ZnS (Dielectric)
-            current_thicknesses.append(0.5)  # Glass thickness
+    Parameters:
+    wl: array-like, wavelength in micrometers.
+    num_bilayers: int, number of bilayers (default=10).
+    """
+    # Load solar irradiance data
+    wl_sol, I = Extraction.extract_solar_irrandiance("Data/ASTM1.5Global.txt", plot=False)
+    I_interp = np.interp(wl, wl_sol, I)
+    
+    zns_thicknesses = np.linspace(0.001, 1, 20)  # Avoid zero thickness
+    aerogel_thicknesses = np.linspace(0.001, 1, 20)  # Avoid zero thickness
+    
+    T_visible = np.zeros((len(zns_thicknesses), len(aerogel_thicknesses)))
+    R_infrared = np.zeros((len(zns_thicknesses), len(aerogel_thicknesses)))
+    R_ultraviolet = np.zeros((len(zns_thicknesses), len(aerogel_thicknesses)))
+    
+    # Calculations for each point in the (zns_thickness, aerogel_thickness) grid
+    for i, zns_thickness in enumerate(zns_thicknesses):
+        for j, aerogel_thickness in enumerate(aerogel_thicknesses):
+            config = create_aerogel_dielectric_multilayer(num_bilayers, zns_thickness, aerogel_thickness)
+            optical_layers = layers(config, wl)
+            R, T, A = calculate_RTA_multilayer(optical_layers, wl, phi0=0)
             
-            scores[j, i] = objective_function(current_thicknesses, layers_config, wl, Irradiance, phi0)
+            # Visible: 400-700 nm
+            mask_visible = (wl >= 0.4) & (wl <= 0.7)
+            T_visible[i, j] = np.mean(T[mask_visible])
+            
+            # Infrared: > 700 nm
+            mask_infrared = (wl > 0.7)
+            R_infrared[i, j] = np.mean(R[mask_infrared])
+            
+            # Ultraviolet: < 400 nm
+            mask_ultraviolet = (wl < 0.4)
+            R_ultraviolet[i, j] = np.mean(R[mask_ultraviolet])
     
-    scores = np.log1p(scores)
+    # Calculate element-wise product T_visible * R_infrared
+    TR_product = T_visible * R_infrared
     
-    plt.figure(figsize=(12, 8))
-    contour = plt.contourf(D_ZnS, D_Air, scores, levels=50, cmap='plasma')
+    plt.figure(figsize=(20, 5))
+    plt.suptitle(f"Performance of ZnS-aerogel structure at 0° ({num_bilayers} bilayers)", fontsize=16, y=0.97)
     
-    try:
-        opt_thicknesses = optimize_layer_thicknesses_10l(layers_config, wl, Irradiance, phi0)
-        opt_Air = opt_thicknesses[::2]  # Extract optimized air layers
-        opt_ZnS = opt_thicknesses[1::2]  # Extract optimized ZnS layers
-        plt.scatter(np.mean(opt_Air), np.mean(opt_ZnS), c='red', marker='x', s=100, 
-                   label=f'Optimum (Air: {np.mean(opt_Air):.2f} µm, ZnS: {np.mean(opt_ZnS):.2f} µm)')
-        plt.legend()
-    except Exception as e:
-        print(f"Could not plot optimum: {str(e)}")
+    # Plot 1: Visible transmissivity
+    plt.subplot(1, 4, 1)
+    plt.imshow(T_visible,
+               extent=[aerogel_thicknesses[0], aerogel_thicknesses[-1],
+                       zns_thicknesses[0], zns_thicknesses[-1]],
+               origin='lower', aspect='auto', cmap='viridis')
+    plt.colorbar(label='Transmissivity (T)')
+    plt.xlabel('Aerogel thickness (µm)')
+    plt.ylabel('ZnS thickness (µm)')
+    plt.title('Visible transmissivity (400-700 nm)')
     
-    plt.colorbar(contour, label='Score (log scale)')
-    plt.xlabel('Aerogel Thickness (µm)')
-    plt.ylabel('ZnS Thickness (µm)')
-    plt.title('Optimization Landscape of 10-Layer Aerogel/ZnS System', fontsize =12)
-    plt.savefig("Output/Aerogel/Optimization_Landscape_Air_ZnS_{}.png".format(len(d_air_range)))
+    # Plot 2: Infrared reflectivity
+    plt.subplot(1, 4, 2)
+    plt.imshow(R_infrared,
+               extent=[aerogel_thicknesses[0], aerogel_thicknesses[-1],
+                       zns_thicknesses[0], zns_thicknesses[-1]],
+               origin='lower', aspect='auto', cmap='viridis')
+    plt.colorbar(label='Reflectivity (R)')
+    plt.xlabel('Aerogel thickness (µm)')
+    plt.ylabel('ZnS thickness (µm)')
+    plt.title('Infrared reflectivity (>700 nm)')
+    
+    # Plot 3: Ultraviolet reflectivity
+    plt.subplot(1, 4, 3)
+    plt.imshow(R_ultraviolet,
+               extent=[aerogel_thicknesses[0], aerogel_thicknesses[-1],
+                       zns_thicknesses[0], zns_thicknesses[-1]],
+               origin='lower', aspect='auto', cmap='viridis')
+    plt.colorbar(label='Reflectivity (R)')
+    plt.xlabel('Aerogel thickness (µm)')
+    plt.ylabel('ZnS thickness (µm)')
+    plt.title('UV reflectivity (<400 nm)')
+    
+    # Plot 4: Product (Visible transmissivity * Infrared reflectivity)
+    plt.subplot(1, 4, 4)
+    plt.imshow(TR_product,
+               extent=[aerogel_thicknesses[0], aerogel_thicknesses[-1],
+                       zns_thicknesses[0], zns_thicknesses[-1]],
+               origin='lower', aspect='auto', cmap='viridis')
+    plt.colorbar(label='T_visible × R_infrared')
+    plt.xlabel('Aerogel thickness (µm)')
+    plt.ylabel('ZnS thickness (µm)')
+    plt.title('Product T_vis × R_IR')
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.savefig("Output/Aerogel/ZnS_aerogel_performance.png")
     plt.show()
 
 def plot_ellipsometry(save=True, config=None):
@@ -632,7 +696,7 @@ def Psi_Delta_theory(config, wl, phi0):
     delta = np.angle(rho)
     return np.degrees(psi), np.degrees(delta)
 
-    return 
+     
 if __name__ == "__main__":
     # Configuration initiale
     config = [
@@ -647,42 +711,45 @@ if __name__ == "__main__":
     wl = np.linspace(0.2, 20, 1000)  
     I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt", wl)
 
-    config_metal = [
-        ("air", 0),
-        ("Ag", 0.09),
-        ("glass", 0.5)
-    ]
+    # config_metal = [
+    #     ("air", 0),
+    #     ("Ag", 0.09),
+    #     ("glass", 0.5)
+    # ]
 
-    config_glass = [
-        ("air", 0),
-        ("glass", 0.5)
-    ]
+    # config_glass = [
+    #     ("air", 0),
+    #     ("glass", 0.5)
+    # ]
 
-    config_copper = [
-        ("air", 0),
-        ("Cu", 0.01),
-        ("glass", 0.5)
-    ]
-    config_aero = [
-            ("air", 0),
-            ("ZnS", 0.01),
-            ("air", 0.01),
-            ("ZnS", 0.01),
-            ("air", 0.01),
-            ("ZnS", 0.01),
-            ("air", 0.01),
-            ("ZnS", 0.01),
-            ("air", 0.01),
-            ("glass", 0.5)
-        ]
+    # config_copper = [
+    #     ("air", 0),
+    #     ("Cu", 0.01),
+    #     ("glass", 0.5)
+    # ]
+    # # Multilayer system with 10 layers of ZnS/Airogel
+    # config_aero = [
+    #     ("air", 0),
+    #     ("ZnS", 0.01),
+    #     ("aerogel", 0.01),
+    #     ("ZnS", 0.01),
+    #     ("aerogel", 0.01),
+    #     ("ZnS", 0.01),
+    #     ("aerogel", 0.01),
+    #     ("ZnS", 0.01),
+    #     ("aerogel", 0.01),
+    #     ("ZnS", 0.01),
+    #     ("aerogel", 0.01),
+    #     ("glass", 4e3)
+    # ]
 
     power_saving_information= False
-    aerogel = False 
-    optim_d = False
+    aerogel = False
+    optim_d = True
+    
 
-    plot_ellipsometry(save = False, config = config)
-   
-
+    l = layers(config, wl)
+    # plot_R_T_A_fixed_phi0_and_d_multilayer(config_aero, wl, I, phi0=0, title="Multilayer System", save=False)
 
     
     if power_saving_information :
@@ -702,11 +769,22 @@ if __name__ == "__main__":
         P_copper = power_save(wl, I, R_copper, T_copper, A_copper, False)
         print("The power saved by the copper layer is :", P_copper, " w")
     
-    d = np.linspace(0.001, 0.04, 50)
+    d = np.linspace(0.001, 0.04, 40)
 
     if optim_d : 
         print("Optimizing the thicknesses of the multilayer system")
-        plot_optimization_landscape(config, wl,d,d, I, phi0=0)
+        d_zns, d_cu, d_zns = optimize_layer_thicknesses(config, wl, I, phi0=0, Spectrum_UV_IR= True)
+
+        config = [
+            ("air", 0),
+            ("ZnS", d_zns),
+            ("Cu", d_cu),
+            ("ZnS", d_zns),
+            ("glass", 10)
+        ]
+        print(f"Optimized thicknesses: ZnS1={d_zns*1000:.2f} µm, Cu={d_cu*1000:.2f} µm, ZnS2={d_zns*1000:.2f} µm")
+
+        plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, I, phi0=28.7, title="Optimized Multilayer System at solar noon", save=True)
 
     #10 bilayer of ZnS/Air 
     if aerogel:
@@ -714,17 +792,10 @@ if __name__ == "__main__":
         config = [
             ("air", 0),
             ("ZnS", 0.01),
-            ("air", 0.01),
-            ("ZnS", 0.01),
-            ("air", 0.01),
-            ("ZnS", 0.01),
-            ("air", 0.01),
-            ("ZnS", 0.01),
-            ("air", 0.01),
+            ("aerogel", 0.01),
             ("glass", 0.5)
         ]
-        d = np.linspace(0.001, 1, 250)
-        plot_optimization_landscape_10l(config, wl, d,d, I, phi0=0)
+        explore_multilayer_performance(wl, num_bilayers=10)
     
     
         

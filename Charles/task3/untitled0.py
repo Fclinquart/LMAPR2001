@@ -1131,7 +1131,7 @@ if __name__ == "__main__":
         {"material": "ZnS", "thickness": 0.035},
         {"material": "Copper", "thickness": 0.025},
         {"material": "ZnS", "thickness": 0.035},
-        {"material": "Glass", "thickness": 0.5},
+        {"material": "Glass", "thickness": 1},
     ]
     
 

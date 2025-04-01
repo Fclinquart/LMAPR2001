@@ -135,6 +135,7 @@ def extract_solar_irrandiance(file_path, plot=False):
                 wl.append(float(parts[0])/1000)
                 solar_irradiance.append(float(parts[1])*1000)
     if plot:
+        plt.figure(figsize=(10, 6))
         plt.plot(wl, solar_irradiance)
         plt.xlabel("Wavelength (µm)")
         plt.ylabel("Solar Irradiance (W/m²/µm)")
@@ -231,5 +232,3 @@ def extract_spectral_data(file_path, phi0 = 45):
             
     return wl[:-2], Psi[:-2], Delta[:-2]
 
-wl, Psi, Delta = extract_spectral_data("Data/FRANCOIS_45.txt")
-print(wl)
