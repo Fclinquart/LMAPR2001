@@ -22,9 +22,15 @@ def layers(config, wl_interp, debug=False):
     
     material_files = {
         "ZnS": "Data/ZnS_Querry.txt",
-        "Cu": "Data/n_k_copper.txt",
+        "Cu": "Data/Cu_Querry.txt",
         "glass": "Data/Glass_Palik.txt",
-        "Ag": "Data/Ag_Hagemann.txt"
+        "Ag": "Data/Ag_Hagemann.txt",
+        "TiO2": "Data/TiO2_Franta.txt",
+        "SiO2": "Data/Glass_Palik.txt",
+        "Al": "Data/Al_rakic.txt",
+        "PMMA": "Data/PMMA_Zhang.txt",
+        "ZnO": "Data/ZnO_Bond.txt",
+        "VO2": "Data/VO2_Beaini.txt",
     }
     
     for material, thickness in config:
@@ -342,7 +348,7 @@ def plot_optimization_landscape(layers_config, wl, d_ZnS_range, d_Cu_range, Irra
     plt.savefig("Output/Optimal_thickness/Optimization_Landscape_{}.png".format(len(d_ZnS_range)))
     plt.show()
 
-def comparaison(config1, config2, config3, wl, Irrandiance = False,  phi0 = 0, title = "",  save = False, debug = False):
+def comparaison(config1, config2, config3, wl, config4=None, config5 =None, Irrandiance = False,  phi0 = 0, title = "",  save = False, debug = False):
     """
     Compare the performance of three distinct configurations : "
     "1. the 3-layers "
@@ -353,15 +359,23 @@ def comparaison(config1, config2, config3, wl, Irrandiance = False,  phi0 = 0, t
     R_multi, T_multi, A_multi = calculate_RTA_multilayer(layers(config1,wl), wl, phi0)
     R_metal, T_metal, A_metal = calculate_RTA_multilayer(layers(config2,wl), wl, phi0)
     R_glass, T_glass, A_glass = calculate_RTA_multilayer(layers(config3,wl), wl, phi0)
+    if config4 is not None:
+        R_config4, T_config4, A_config4 = calculate_RTA_multilayer(layers(config4,wl), wl, phi0)
+    if config5 is not None:
+        R_config5, T_config5, A_config5 = calculate_RTA_multilayer(layers(config5,wl), wl, phi0)
 
     if Irrandiance:
         I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt", wl)
     
     fig, axs = plt.subplots(3, 1, figsize=(10, 18), sharex=True)
     
-    axs[0].plot(wl, R_multi, label="Multilayer", color='blue')
-    axs[0].plot(wl, R_metal, label="Metallic layer", color='red')
-    axs[0].plot(wl, R_glass, label="Bare Glass", color='green')
+    axs[0].plot(wl, R_multi, label="{}/{}/{}".format(config1[1][0],config1[2][0],config1[3][0]), color='blue')
+    axs[0].plot(wl, R_metal, label="{}/{}/{}".format(config2[1][0],config2[2][0],config2[3][0]), color='red')
+    axs[0].plot(wl, R_glass, label="{}/{}/{}".format(config3[1][0],config3[2][0],config3[3][0]), color='green')
+    if config4 is not None:
+        axs[0].plot(wl, R_config4, label="{}/{}/{}".format(config4[1][0],config4[2][0],config4[3][0]), color='purple')
+    if config5 is not None:
+        axs[0].plot(wl, R_config5, label="{}/{}/{}".format(config5[1][0],config5[2][0],config5[3][0]), color='orange')
     axs[0].axvspan(0.4, 0.7, color="yellow", alpha=0.05)
     axs[0].axvspan(0.2, 0.4, color="purple", alpha=0.05)
     axs[0].axvspan(0.7, 20, color="red", alpha=0.05)
@@ -385,6 +399,10 @@ def comparaison(config1, config2, config3, wl, Irrandiance = False,  phi0 = 0, t
     axs[1].plot(wl, T_multi, label="Multilayer", color='blue')
     axs[1].plot(wl, T_metal, label="Metallic layer", color='red')
     axs[1].plot(wl, T_glass, label="Bare Glass", color='green')
+    if config4 is not None:
+        axs[1].plot(wl, T_config4, label="Config4", color='purple')
+    if config5 is not None:
+        axs[1].plot(wl, T_config5, label="Config5", color='orange')
     axs[1].set_ylabel("T")
     
     axs[1].set_title("Transmissivity")
@@ -396,6 +414,10 @@ def comparaison(config1, config2, config3, wl, Irrandiance = False,  phi0 = 0, t
     axs[2].plot(wl, A_multi, label="Multilayer", color='blue')
     axs[2].plot(wl, A_metal, label="Metallic layer", color='red')
     axs[2].plot(wl, A_glass, label="Bare Glass", color='green')
+    if config4 is not None:
+        axs[2].plot(wl, A_config4, label="Config4", color='purple')
+    if config5 is not None:
+        axs[2].plot(wl, A_config5, label="Config5", color='orange')
     axs[2].set_ylabel("A")
     axs[2].set_title("Absorbance")
     axs[2].set_xscale('log')
@@ -482,6 +504,7 @@ def power_save(wl, Irradiance, R, T, A, debug=False):
         print(f"Power absorbed: {power_a} W")
         print("L'énergie transmisse et l'énergie absorbé rechauffe la piece car l'énergie absorbée par la vitre est thermalisé")
         print("#" * 60)
+    print(f"Pourcentage de l'énergie reflechie : {power_r/power_sun*100:.2f}%")
     return power_r
 
 def create_aerogel_dielectric_multilayer(num_bilayers, zns_thickness, aerogel_thickness):
@@ -696,70 +719,292 @@ def Psi_Delta_theory(config, wl, phi0):
     delta = np.angle(rho)
     return np.degrees(psi), np.degrees(delta)
 
-     
+
+
 if __name__ == "__main__":
-    # Configuration initiale
-    config = [
-        ("air", 0),
-        ("ZnS", 0.01),
-        ("Cu", 0.01),
-        ("ZnS", 0.01),
-        ("glass", 0.5)
-        
-    ]
 
-    wl = np.linspace(0.2, 20, 1000)  
+    wl = np.linspace(0.2, 20, 1000)
     I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt", wl)
+    
+    
+   
 
-    # config_metal = [
-    #     ("air", 0),
-    #     ("Ag", 0.09),
-    #     ("glass", 0.5)
-    # ]
-
-    # config_glass = [
-    #     ("air", 0),
-    #     ("glass", 0.5)
-    # ]
-
-    # config_copper = [
-    #     ("air", 0),
-    #     ("Cu", 0.01),
-    #     ("glass", 0.5)
-    # ]
-    # # Multilayer system with 10 layers of ZnS/Airogel
-    # config_aero = [
-    #     ("air", 0),
-    #     ("ZnS", 0.01),
-    #     ("aerogel", 0.01),
-    #     ("ZnS", 0.01),
-    #     ("aerogel", 0.01),
-    #     ("ZnS", 0.01),
-    #     ("aerogel", 0.01),
-    #     ("ZnS", 0.01),
-    #     ("aerogel", 0.01),
-    #     ("ZnS", 0.01),
-    #     ("aerogel", 0.01),
-    #     ("glass", 4e3)
-    # ]
 
     power_saving_information= False
     aerogel = False
-    optim_d = True
+    optim_d = False
+    ZnS_info = False
+    Cu_info = False
+    Test = False
+    Cu_dielec = False
+    Ag_dielec = False
+    comparaison_multi = False
+    plot_ten_layer = True
+
+    if plot_ten_layer:
+        config = create_aerogel_dielectric_multilayer(10, 0.3, 0.3)
+        
+        plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, Irradiance=I, phi0=0, title="aerogel", save=True)
     
 
-    l = layers(config, wl)
-    # plot_R_T_A_fixed_phi0_and_d_multilayer(config_aero, wl, I, phi0=0, title="Multilayer System", save=False)
+    if Cu_dielec:  # Add a condition here if needed
+        # Configuration initiale
+        config = [
+            ("air", 0),
+            ("ZnS", 0.032),
+            ("Cu", 0.022),
+            ("ZnS", 0.032),
+            ("glass", 10)
+        ]
 
+        config_2 = [
+            ("air", 0),
+            ("VO2", 0.022),
+            ("Cu", 0.022),
+            ("VO2", 0.022),
+            ("glass", 10)
+        ]
+
+        d_Zn0, d_Cu, d_ZnO = optimize_layer_thicknesses(config_2, wl, I, phi0=0, Spectrum_UV_IR=True)
+
+        config_2 = [
+            ("air", 0),
+            ("VO2", d_Zn0),
+            ("Cu", d_Cu),
+            ("VO2", d_ZnO),
+            ("glass", 10)
+        ]
+
+        config_3 = [
+            ("air", 0),
+            ("TiO2", 0.032),
+            ("Cu", 0.022),
+            ("TiO2", 0.032),
+            ("glass", 10)
+        ]
+
+        d_TiO2, d_Cu, d_TiO2 = optimize_layer_thicknesses(config_3, wl, I, phi0=0, Spectrum_UV_IR=True)
+
+        config_3 = [
+            ("air", 0),
+            ("TiO2", d_TiO2),
+            ("Cu", d_Cu),
+            ("TiO2", d_TiO2),
+            ("glass", 10)
+        ]
+
+        config_4 = [
+            ("air", 0),
+            ("SiO2", 0.032),
+            ("Cu", 0.022),
+            ("SiO2", 0.032),
+            ("glass", 10)
+        ]
+
+        d_SiO2, d_Cu, d_SiO2 = optimize_layer_thicknesses(config_4, wl, I, phi0=0, Spectrum_UV_IR=True)
+
+        config_4 = [
+            ("air", 0),
+            ("SiO2", d_SiO2),
+            ("Cu", d_Cu),
+            ("SiO2", d_SiO2),
+            ("glass", 10)
+        ]
+
+        config_5 = [
+            ("air", 0),
+            ("PMMA", 0.032),
+            ("Cu", 0.022),
+            ("PMMA", 0.032),
+            ("glass", 10)
+        ]
+
+        d_PMMA, d_Cu, d_PMMA = optimize_layer_thicknesses(config_5, wl, I, phi0=0, Spectrum_UV_IR=True)
+        config_5 = [
+            ("air", 0),
+            ("PMMA", d_PMMA),
+            ("Cu", d_Cu),
+            ("PMMA", d_PMMA),
+            ("glass", 10)
+        ]
+
+        comparaison(config, config_2, config_3, wl, config_4, config_5, Irrandiance=True, phi0=0, title="ZnS-VO2-SiO2-TiO2-PMMA_Copper", save=True)
+        if Ag_dielec:  # Add a condition here if needed
+            # Configuration initiale
+            config = [
+                ("air", 0),
+                ("ZnS", 0.032),
+                ("Ag", 0.022),
+                ("ZnS", 0.032),
+                ("glass", 10)
+            ]
+
+            config_2 = [
+                ("air", 0),
+                ("VO2", 0.022),
+                ("Ag", 0.022),
+                ("VO2", 0.022),
+                ("glass", 10)
+            ]
+
+            d_Zn0, d_Ag, d_ZnO = optimize_layer_thicknesses(config_2, wl, I, phi0=0, Spectrum_UV_IR=True)
+
+            config_2 = [
+                ("air", 0),
+                ("VO2", d_Zn0),
+                ("Ag", d_Ag),
+                ("VO2", d_ZnO),
+                ("glass", 10)
+            ]
+
+            config_3 = [
+                ("air", 0),
+                ("TiO2", 0.032),
+                ("Ag", 0.022),
+                ("TiO2", 0.032),
+                ("glass", 10)
+            ]
+
+            d_TiO2, d_Ag, d_TiO2 = optimize_layer_thicknesses(config_3, wl, I, phi0=0, Spectrum_UV_IR=True)
+
+            config_3 = [
+                ("air", 0),
+                ("TiO2", d_TiO2),
+                ("Ag", d_Ag),
+                ("TiO2", d_TiO2),
+                ("glass", 10)
+            ]
+
+            config_4 = [
+                ("air", 0),
+                ("SiO2", 0.032),
+                ("Ag", 0.022),
+                ("SiO2", 0.032),
+                ("glass", 10)
+            ]
+
+            d_SiO2, d_Ag, d_SiO2 = optimize_layer_thicknesses(config_4, wl, I, phi0=0, Spectrum_UV_IR=True)
+
+            config_4 = [
+                ("air", 0),
+                ("SiO2", d_SiO2),
+                ("Ag", d_Ag),
+                ("SiO2", d_SiO2),
+                ("glass", 10)
+            ]
+
+            config_5 = [
+                ("air", 0),
+                ("PMMA", 0.032),
+                ("Ag", 0.022),
+                ("PMMA", 0.032),
+                ("glass", 10)
+            ]
+
+            d_PMMA, d_Ag, d_PMMA = optimize_layer_thicknesses(config_5, wl, I, phi0=0, Spectrum_UV_IR=True)
+            config_5 = [
+                ("air", 0),
+                ("PMMA", d_PMMA),
+                ("Ag", d_Ag),
+                ("PMMA", d_PMMA),
+                ("glass", 10)
+            ]
+
+            comparaison(config, config_2, config_3, wl, config_4, config_5, Irrandiance=True, phi0=0, title="ZnS-VO2-SiO2-TiO2-PMMA_Silver", save=True)
+    if ZnS_info :
+        
+        wl = np.linspace(0.2, 40, 1000)
+        n, k = Extraction.interpolate(wl, *Extraction.extract_wl_n_k("Data/ZnS_Querry.txt"))
+        n1 = n - 1j * k
+        n0 = 1.0
+        phi0 = 0
+        R = task2.reflectivity_semi_infinite_layer(n0, n1, phi0)
+        print("Calculating the reflectivity of ZnS")
+        plt.figure(figsize=(10, 6))
+        plt.plot(wl, R, label="R", linewidth=2)
+        plt.xlabel("Wavelength (µm)")
+        plt.ylabel("Reflectivity")
+        plt.title("Reflectivity of ZnS")
+        plt.xscale('log')
+        plt.legend()
+        plt.axvspan(0.4, 0.7, color="yellow", alpha=0.05, label="Visible")
+        plt.axvspan(0.2, 0.4, color="purple", alpha=0.05, label="UV")
+        plt.axvspan(0.7, 20, color="red", alpha=0.05, label="IR")
+        plt.show()
+
+        task2.plot_n_k(wl, n, k, title="ZnS", log=True)
+
+        config = [
+            ("air", 0),
+            ("ZnS", 1),
+    
+        ]
+
+        
+    if Cu_info :
+       
+        n, k = Extraction.interpolate(wl, *Extraction.extract_wl_n_k("Data/Cu_Querry.txt"))
+        n1 = n - 1j * k
+        n0 = 1.0
+        phi0 = 0
+        R = task2.reflectivity_semi_infinite_layer(n0, n1, phi0)
+        print("Calculating the reflectivity of Cu")
+        plt.figure(figsize=(10, 6))
+        plt.plot(wl, R, label="R", linewidth=2)
+        plt.xlabel("Wavelength (µm)")
+        plt.ylabel("Reflectivity")
+        plt.title("Reflectivity of Cu") 
+        plt.xscale('log')
+        plt.legend()
+        plt.axvspan(0.4, 0.7, color="yellow", alpha=0.05, label="Visible")
+        plt.axvspan(0.2, 0.4, color="purple", alpha=0.05, label="UV")
+        plt.axvspan(0.7, 20, color="red", alpha=0.05, label="IR")
+        plt.savefig("Output/Cu/Cu_Transmittance.png")
+        plt.show()
+        task2.plot_n_k(wl, n, k, title="Cu", log=True)
+    # Plot the ellipsometry data
     
     if power_saving_information :
+        config = [
+            ("air", 0),
+            ("ZnS", 0.032),
+            ("Cu", 0.022),
+            ("ZnS", 0.032),
+            ("glass", 10)
+        ]
+
+        config_metal = [
+            ("air", 0),
+            ("Ag", 0.009),
+            ("glass", 10)
+        ]
+        config_copper = [
+            ("air", 0),
+            ("Cu", 0.009),
+            ("glass", 10)
+        ]
+        config_2 = [
+            ("air", 0),
+            ("ZnS", 0.032),
+            ("Ag", 0.022),
+            ("ZnS", 0.032),
+            ("glass", 10)
+        ]
+
+        d_ZnS1, d_Ag, d_ZnS2 = optimize_layer_thicknesses(config_2, wl, I, phi0=0, Spectrum_UV_IR=True)
+        config_2 = [
+            ("air", 0),
+            ("ZnS", d_ZnS1),
+            ("Ag", d_Ag),
+            ("ZnS", d_ZnS2),
+            ("glass", 10)
+        ]
+        
         R, T, A = calculate_RTA_multilayer(layers(config, wl), wl)
         P = power_save(wl, I, R, T, A, False)
         print("The power saved in the case of the multilayer system  is :", P, " w")
 
-        R_glass, T_glass, A_glass = calculate_RTA_multilayer(layers(config_glass, wl), wl)
-        P_glass = power_save(wl, I, R_glass, T_glass, A_glass, False)
-        print("The power saved by the bare glass is :", P_glass, " w")
+       
 
         R_metal, T_metal, A_metal = calculate_RTA_multilayer(layers(config_metal, wl), wl)
         P_metal = power_save(wl, I, R_metal, T_metal, A_metal, False)
@@ -768,6 +1013,10 @@ if __name__ == "__main__":
         R_copper, T_copper, A_copper = calculate_RTA_multilayer(layers(config_copper, wl), wl)
         P_copper = power_save(wl, I, R_copper, T_copper, A_copper, False)
         print("The power saved by the copper layer is :", P_copper, " w")
+
+        R_2, T_2, A_2 = calculate_RTA_multilayer(layers(config_2, wl), wl)
+        P_2 = power_save(wl, I, R_2, T_2, A_2, False)
+        print("The power saved in the case of the multilayer system with Ag is :", P_2, " w")
     
     d = np.linspace(0.001, 0.04, 40)
 
@@ -783,8 +1032,24 @@ if __name__ == "__main__":
             ("glass", 10)
         ]
         print(f"Optimized thicknesses: ZnS1={d_zns*1000:.2f} µm, Cu={d_cu*1000:.2f} µm, ZnS2={d_zns*1000:.2f} µm")
+        config_metal = [
+            ("air", 0),
+            ("Ag", 0.009),
+            ("glass", 10)
+        ]
+        config_glass = [
+            ("air", 0),
+            ("glass", 1)
+        ]
+        comparaison(config, config_metal, config_glass, wl, True, phi0=0, title="Opt_Ag", save=True)
 
-        plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, I, phi0=28.7, title="Optimized Multilayer System at solar noon", save=True)
+        config_metal = [
+            ("air", 0),
+            ("Cu", 0.009),
+            ("glass", 10)
+        ]
+
+        comparaison(config, config_metal, config_glass, wl, True, phi0=0, title="Opt_Cu", save=True)
 
     #10 bilayer of ZnS/Air 
     if aerogel:
@@ -798,4 +1063,38 @@ if __name__ == "__main__":
         explore_multilayer_performance(wl, num_bilayers=10)
     
     
-        
+    if comparaison_multi:  # Add a condition here if needed
+        # Define initial configurations for ZnS/Al/ZnS, ZnS/Cu/ZnS, and ZnS/Ag/ZnS
+        configs = {
+            "ZnS/Al/ZnS": [("air", 0), ("ZnS", 0.032), ("Al", 0.022), ("ZnS", 0.032), ("glass", 10)],
+            "ZnS/Cu/ZnS": [("air", 0), ("ZnS", 0.032), ("Cu", 0.022), ("ZnS", 0.032), ("glass", 10)],
+            "ZnS/Ag/ZnS": [("air", 0), ("ZnS", 0.032), ("Ag", 0.022), ("ZnS", 0.032), ("glass", 10)],
+        }
+
+        optimized_configs = {}
+
+        # Optimize thicknesses for each configuration
+        for name, config in configs.items():
+            d_ZnS1, d_metal, d_ZnS2 = optimize_layer_thicknesses(config, wl, I, phi0=0, Spectrum_UV_IR=True)
+            optimized_configs[name] = [
+                ("air", 0),
+                ("ZnS", d_ZnS1),
+                (config[2][0], d_metal),  # Use the metal from the original config
+                ("ZnS", d_ZnS2),
+                ("glass", 10),
+            ]
+
+        # Compare the optimized configurations
+        comparaison(
+            optimized_configs["ZnS/Al/ZnS"],
+            optimized_configs["ZnS/Cu/ZnS"],
+            optimized_configs["ZnS/Ag/ZnS"],
+            wl,
+            Irrandiance=True,
+            phi0=0,
+            title="Comparison_ZnS_Al_Cu_Ag",
+            save=True,
+        )
+
+
+    

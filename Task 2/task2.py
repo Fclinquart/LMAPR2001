@@ -140,7 +140,7 @@ def compute_R_T_circular(n0, n1, n2, d1, wavelength, phi0):
         - T (float): Transmissivity.
         - A (float): Absorbance.
     """
-    print("Task 2 : Calculating reflection and transmission coefficients for circular polarization...")
+    
     phi0 = np.radians(phi0)
     
     sin_phi0 = np.sin(phi0)
@@ -706,13 +706,8 @@ def read_plot_FTIR(filename):
 if __name__ == "__main__":
     print ("Task 2 :")
     filename = "Data/n_k_combined.txt"
-
-    lambda_um, n0, n1, n2 = refraction_index(filename)
-   
-  
-
-    R_UV, T_UV, A_UV = spectral_RTA('UV', lambda_um, n0, n1, n2, [10e-3], 0, Solar_spectrum(filename))
-    print("Reflectivity in UV spectrum for 10 nm thickness: ", R_UV)
     
+
+
 
 
