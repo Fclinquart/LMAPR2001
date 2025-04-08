@@ -111,8 +111,89 @@ def calculate_refractive_index_air(wl, plot=False):
          
     return n
 
+def irradiance_black_body(wl, T,thetha):
+    """
+    Calculate the irradiance of a black body at a given temperature (T) for a range of wavelengths (wl).
+    
+    Parameters:
+        wl (numpy.ndarray): Wavelengths in nm.
+        T (float): Temperature in Kelvin.
+    
+    Returns:
+        numpy.ndarray: Irradiance values.
+    """
+    h = 6.62607015e-34  # Planck's constant (J·s)
+    c = 3e8  # Speed of light (m/s)
+    k = 1.380649e-23  # Boltzmann constant (J/K)
+   
+
+    wl_m = wl*1e-6  # Convert wavelength from nm to m
+    irradiance = (2 * h * c**2) / (wl_m**5) * (1 / (np.exp((h * c) / (wl_m * k * T)) - 1)) 
+    
+    return irradiance * np.cos(thetha) * 1e-9  # Convert to W/m²/nm
+
+def plot_black_body_spectrum(wl, T, thetha):
+    """
+    Plot the black body spectrum for a given temperature (T) and angle (thetha).
+    
+    Parameters:
+        wl (numpy.ndarray): Wavelengths in nm.
+        T (float): List of Temperature in Kelvin.
+        thetha (float): Angle in radians.
+    
+    Returns:
+        None
+    """
+    
+    
+    plt.figure(figsize=(10, 6))
+    for i, temp in enumerate(T):
+        irrandiance = irradiance_black_body(wl, temp + 273.15, thetha)
+        plt.plot(wl, irrandiance, label='T = {} °C'.format(temp))
+    plt.xlabel('Wavelength (nm)')
+    plt.ylabel('Irradiance (W/m²sr nm)')
+   
+    
+    plt.legend(loc='upper right', fontsize='small')
+    plt.savefig('Output/Black_Body/black_body_spectrum{}.png'.format(T), dpi=300)
+
+def plot_solar_irrandiance_vs_black_body(filename, filename2, wl, T, thetha):
+    """
+    Plot the solar irradiance and black body spectrum for a given temperature (T) and angle (thetha).
+    
+    Parameters:
+        wl (numpy.ndarray): Wavelengths in nm.
+        T (float): Temperature in Kelvin.
+        thetha (float): Angle in radians.
+    
+    Returns:
+        None
+    """
+    data = np.loadtxt(filename)
+    wavelength = data[:, 0]/1000
+    flux = data[:, 1]
+
+    data2 = np.loadtxt(filename2)
+    wavelength2 = data2[:, 0]/1000
+    flux2 = data2[:, 1]
+    plt.figure(figsize=(10, 6))
+    plt.plot(wavelength, flux, label='ASTM0 Extraterrestrial', color='orange')
+    plt.plot(wavelength2, flux2, label='AMST1.5 Global irradiance', color='blue')
+    i = irradiance_black_body(wl, T, thetha)/1e4
+    plt.plot(wl, i, label='Black Body Spectrum {} K'.format(T), color='red')
+    plt.xlabel('Wavelength (nm)')
+    plt.ylabel('Irradiance (W/m²/nm)')
+    
+    plt.legend(loc='upper right', fontsize='small')
+    plt.savefig('Output/Black_Body/solar_irradiance_vs_black_body.png', dpi=300)
+
+
+    
+    
+
 
 if __name__ == "__main__":
-    wl = np.linspace(0.2, 200, 100000)
-    n = calculate_refractive_index_air(wl, plot=True)
+    wl = np.linspace(0.2, 20, 100000)
+    plot_black_body_spectrum(wl, [-50,25,100], 0)
+    plot_solar_irrandiance_vs_black_body('Data/ASTM0.txt', 'Data/ASTM1.5Global.txt', wl, 6000,0)
     

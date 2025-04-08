@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sys
 import os
+import re
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Task 2'))
 sys.path.append(parent_dir)
 import task2 # type: ignore
@@ -182,53 +183,72 @@ def interpolate(wl_interp, wl, n, k):
     k_interp = np.interp(wl_interp, wl, k)
     return n_interp, k_interp
 
-def extract_spectral_data(file_path, phi0 = 45):
-    """
-    Extrait les données spectrales d'un fichier texte ellipsométrique
- 
-        tuple: (wl, Psi, Delta) où:
-            - wl: liste des longueurs d'onde en nm
-            - Psi: liste des angles Psi en degrés
-            - Delta: liste des angles Delta en degrés
-    """
-    wl = []
-    Psi = []
-    Delta = []
+def read_and_plot_ellipsometry(file_elli45, debug=False):
+    """Reads an ellipsometry file and returns experimental Psi and Delta curves."""
+    def debug_message(message, debug=False):
+        if debug:
+            print(f"[DEBUG] {message}")
     
-    encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
+    debug_message(f"Reading file: {file_elli45}", debug)
     
-    for encoding in encodings:
-        try:
-            with open(file_path, 'r', encoding=encoding) as file:
-                lines = file.readlines()
-                
-                # Recherche du début des données
-                data_start = False
-                for line in lines:
-                    if "# DATA:" in line:
-                        data_start = True
-                        continue
-                    
-                    if data_start and line.strip() and not line.startswith('#'):
-                        parts = line.split()
-                        if len(parts) >= 3:
-                            try:
-                                wl.append(float(parts[0]))
-                                Psi.append(float(parts[1]))
-                                Delta.append(float(parts[2]))
-                            except (ValueError, IndexError):
-                                continue
-                    
-                
-                if wl:  # Si on a trouvé des données, on sort
-                    break
-                
-                    
-        except UnicodeDecodeError:
-            continue
+    angle = re.search(r'\d+', file_elli45)
+    angle = angle.group() if angle else "Unknown"
+    
+    try:
+        with open(file_elli45, 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+        debug_message("File read with UTF-8 encoding.", debug)
+    except UnicodeDecodeError:
+        with open(file_elli45, 'r', encoding='latin-1') as file:
+            lines = file.readlines()
+        debug_message("File read with Latin-1 encoding.", debug)
+    
+    data = []
+    for line in lines:
+        if line.strip() and not line.startswith('#') and not line.startswith('nm'):
+            parts = line.split()
+            if len(parts) == 3:
+                try:
+                    nm = float(parts[0])
+                    psi = float(parts[1])
+                    delta = float(parts[2])
+                    data.append((nm, psi, delta))
+                except ValueError:
+                    debug_message(f"Ignored line (conversion failed): {line.strip()}", debug)
+                    continue
+    
+    if not data:
+        debug_message("No valid data found in the file.", debug)
+        return None, None
+    
+    data = data[:-2]
+    debug_message("Last point excluded from data.", debug)
+    
+    df = pd.DataFrame(data, columns=['nm', 'Psi', 'Delta'])
+    debug_message(f"Number of data points extracted: {len(df)}", debug)
+    debug_message(f"Data extracted:\n{df}", debug)
+    
+    if debug:
+        # Plot the graphs
+        plt.figure(figsize=(10, 6))
+        ax1 = plt.gca()
+        ax1.plot(df['nm'], df['Psi'], label='Psi', color='blue')
+        ax1.set_xlabel("Wavelength (nm)")
+        ax1.set_ylabel("Psi (deg)")
+        ax1.tick_params(axis='y')
+        ax1.tick_params(axis='x')
+        ax1.grid(True)
         
-       
-            
-            
-    return wl[:-2], Psi[:-2], Delta[:-2]
+        ax2 = ax1.twinx()
+        ax2.plot(df['nm'], df['Delta'], label='Delta', color='red')
+        ax2.set_ylabel("Delta (deg)")
+        ax2.tick_params(axis='y')
+        
+        fig = plt.gcf()
+        fig.legend(loc='upper left', bbox_to_anchor=(0.1, 0.9))
+        plt.tight_layout()
+        plt.savefig(f"Output/Ellipsometry/Ellipsometry_{angle}.png")
+        debug_message("Plot displayed successfully.", debug)
+    
+    return df['Psi'].values, df['Delta'].values
 

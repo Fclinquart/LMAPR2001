@@ -29,8 +29,10 @@ def layers(config, wl_interp, debug=False):
         "SiO2": "Data/Glass_Palik.txt",
         "Al": "Data/Al_rakic.txt",
         "PMMA": "Data/PMMA_Zhang.txt",
-        "ZnO": "Data/ZnO_Bond.txt",
+        "ZnO": "Data/ZnO.txt",
         "VO2": "Data/VO2_Beaini.txt",
+        "Al2O3": "Data/Al203_Querry.txt",
+        "Gold": "Data/Gold.txt",
     }
     
     for material, thickness in config:
@@ -509,209 +511,85 @@ def power_save(wl, Irradiance, R, T, A, debug=False):
 
 def create_aerogel_dielectric_multilayer(num_bilayers, zns_thickness, aerogel_thickness):
     """
-    Create a multilayer system with alternating layers of ZnS and aerogel (approximated as air).
-    
-    Parameters:
-    num_bilayers: int, number of bilayers (each bilayer consists of one ZnS layer and one aerogel layer).
-    zns_thickness: float, thickness of each ZnS layer in micrometers.
-    aerogel_thickness: float, thickness of each aerogel layer in micrometers.
-    
-    Returns:
-    list of tuples: configurations of the layers for the multilayer system in the format (material, thickness).
+    Create a multilayer system of ZnS and aerogel with a glass substrate.
     """
     layer_configs = []
-    
     for _ in range(num_bilayers):
-        # Add ZnS layer
         layer_configs.append(("ZnS", zns_thickness))
-        # Add aerogel layer
         layer_configs.append(("aerogel", aerogel_thickness))
-    
-    # Add a glass substrate at the end
-    layer_configs.append(("glass", 0.5))  # 0.5 µm thickness for glass
+        
+    layer_configs.append(("glass", 0.5))  # substrate
     
     return layer_configs
 
 def explore_multilayer_performance(wl, num_bilayers=10):
     """
-    Explore the performance of a multilayer system with alternating ZnS and aerogel layers.
-    Generates 2D heatmaps for:
-        - Transmissivity in the visible range
-        - Reflectivity in the infrared range
-        - Reflectivity in the ultraviolet range
-        - Element-wise product of visible transmissivity and infrared reflectivity
-    
-    Parameters:
-    wl: array-like, wavelength in micrometers.
-    num_bilayers: int, number of bilayers (default=10).
+    Evaluate and plot performance of ZnS/aerogel multilayers: 
+    - Reflectivity in IR
+    - Transmissivity in visible
+    - Product of both
     """
-    # Load solar irradiance data
-    wl_sol, I = Extraction.extract_solar_irrandiance("Data/ASTM1.5Global.txt", plot=False)
-    I_interp = np.interp(wl, wl_sol, I)
+    # Load solar spectrum
+    I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt", wl)
     
-    zns_thicknesses = np.linspace(0.001, 1, 20)  # Avoid zero thickness
-    aerogel_thicknesses = np.linspace(0.001, 1, 20)  # Avoid zero thickness
-    
+    zns_thicknesses = np.linspace(0.001, 1, 40)
+    aerogel_thicknesses = np.linspace(0.001, 1, 40)
+
     T_visible = np.zeros((len(zns_thicknesses), len(aerogel_thicknesses)))
     R_infrared = np.zeros((len(zns_thicknesses), len(aerogel_thicknesses)))
-    R_ultraviolet = np.zeros((len(zns_thicknesses), len(aerogel_thicknesses)))
-    
-    # Calculations for each point in the (zns_thickness, aerogel_thickness) grid
-    for i, zns_thickness in enumerate(zns_thicknesses):
-        for j, aerogel_thickness in enumerate(aerogel_thicknesses):
-            config = create_aerogel_dielectric_multilayer(num_bilayers, zns_thickness, aerogel_thickness)
+    TR_product = np.zeros((len(zns_thicknesses), len(aerogel_thicknesses)))
+
+    mask_visible = (wl >= 0.4) & (wl <= 0.7)
+    mask_infrared = (wl > 0.7)
+
+    for i, zns_th in enumerate(zns_thicknesses):
+        for j, aero_th in enumerate(aerogel_thicknesses):
+            config = create_aerogel_dielectric_multilayer(num_bilayers, zns_th, aero_th)
             optical_layers = layers(config, wl)
             R, T, A = calculate_RTA_multilayer(optical_layers, wl, phi0=0)
-            
-            # Visible: 400-700 nm
-            mask_visible = (wl >= 0.4) & (wl <= 0.7)
-            T_visible[i, j] = np.mean(T[mask_visible])
-            
-            # Infrared: > 700 nm
-            mask_infrared = (wl > 0.7)
-            R_infrared[i, j] = np.mean(R[mask_infrared])
-            
-            # Ultraviolet: < 400 nm
-            mask_ultraviolet = (wl < 0.4)
-            R_ultraviolet[i, j] = np.mean(R[mask_ultraviolet])
+            T_visible[i, j] = np.trapz(T[mask_visible] * I[mask_visible], wl[mask_visible])
+            R_infrared[i, j] = np.trapz(R[mask_infrared] * I[mask_infrared], wl[mask_infrared])
+            TR_product[i, j] = T_visible[i, j] * R_infrared[i, j]
     
-    # Calculate element-wise product T_visible * R_infrared
-    TR_product = T_visible * R_infrared
-    
-    plt.figure(figsize=(20, 5))
-    plt.suptitle(f"Performance of ZnS-aerogel structure at 0° ({num_bilayers} bilayers)", fontsize=16, y=0.97)
-    
-    # Plot 1: Visible transmissivity
-    plt.subplot(1, 4, 1)
-    plt.imshow(T_visible,
-               extent=[aerogel_thicknesses[0], aerogel_thicknesses[-1],
-                       zns_thicknesses[0], zns_thicknesses[-1]],
+    # Plot 1 - Visible Transmittivity
+    plt.figure(figsize=(8, 6))
+    plt.imshow(T_visible, extent=[aerogel_thicknesses[0], aerogel_thicknesses[-1],
+                                  zns_thicknesses[0], zns_thicknesses[-1]],
                origin='lower', aspect='auto', cmap='viridis')
-    plt.colorbar(label='Transmissivity (T)')
-    plt.xlabel('Aerogel thickness (µm)')
-    plt.ylabel('ZnS thickness (µm)')
-    plt.title('Visible transmissivity (400-700 nm)')
-    
-    # Plot 2: Infrared reflectivity
-    plt.subplot(1, 4, 2)
-    plt.imshow(R_infrared,
-               extent=[aerogel_thicknesses[0], aerogel_thicknesses[-1],
-                       zns_thicknesses[0], zns_thicknesses[-1]],
-               origin='lower', aspect='auto', cmap='viridis')
-    plt.colorbar(label='Reflectivity (R)')
-    plt.xlabel('Aerogel thickness (µm)')
-    plt.ylabel('ZnS thickness (µm)')
-    plt.title('Infrared reflectivity (>700 nm)')
-    
-    # Plot 3: Ultraviolet reflectivity
-    plt.subplot(1, 4, 3)
-    plt.imshow(R_ultraviolet,
-               extent=[aerogel_thicknesses[0], aerogel_thicknesses[-1],
-                       zns_thicknesses[0], zns_thicknesses[-1]],
-               origin='lower', aspect='auto', cmap='viridis')
-    plt.colorbar(label='Reflectivity (R)')
-    plt.xlabel('Aerogel thickness (µm)')
-    plt.ylabel('ZnS thickness (µm)')
-    plt.title('UV reflectivity (<400 nm)')
-    
-    # Plot 4: Product (Visible transmissivity * Infrared reflectivity)
-    plt.subplot(1, 4, 4)
-    plt.imshow(TR_product,
-               extent=[aerogel_thicknesses[0], aerogel_thicknesses[-1],
-                       zns_thicknesses[0], zns_thicknesses[-1]],
-               origin='lower', aspect='auto', cmap='viridis')
-    plt.colorbar(label='T_visible × R_infrared')
-    plt.xlabel('Aerogel thickness (µm)')
-    plt.ylabel('ZnS thickness (µm)')
-    plt.title('Product T_vis × R_IR')
-    
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.savefig("Output/Aerogel/ZnS_aerogel_performance.png")
+    plt.title(f"Transmittivity Visible ({num_bilayers} bilayers)")
+    plt.xlabel("Aerogel thickness (µm)")
+    plt.ylabel("ZnS thickness (µm)")
+    plt.colorbar(label="Transmittivity")
+    plt.tight_layout()
+    plt.savefig("Output/Aerogel/ZnS_aerogel_transmittivity.png")
     plt.show()
 
-def plot_ellipsometry(save=True, config=None):
-    """
-    Plot the ellipsometry data from a file and interpolate Psi and Delta values for 1000 points of wavelength.
-    
-    Parameters:
-    save : bool
-        If True, save the plots as images.
-    config : list
-        Configuration of the multilayer system.
-    
-    Returns:
-    wl_interp : array-like
-        Interpolated wavelengths in nm.
-    Psi_interp : array-like
-        Interpolated Psi values in degrees.
-    Delta_interp : array-like
-        Interpolated Delta values in degrees.
-    """
-    
-    wl, Psi, Delta = Extraction.extract_spectral_data("Data/FRANCOIS_45.txt")
-    wl65, Psi65, Delta65 = Extraction.extract_spectral_data("Data/FRANCOIS_65.txt")
-
-    # Interpolation for 1000 points
-    wl_interp = np.linspace(min(wl), max(wl), 1000)
-    Psi_interp = np.interp(wl_interp, wl, Psi)
-    Delta_interp = np.interp(wl_interp, wl, Delta)
-    Psi65_interp = np.interp(wl_interp, wl65, Psi65)
-    Delta65_interp = np.interp(wl_interp, wl65, Delta65)
-
-    if config is not None:
-        Psi_theory, Delta_theory = Psi_Delta_theory(config, wl_interp, phi0=45)
-        Psi_theory65, Delta_theory65 = Psi_Delta_theory(config, wl_interp, phi0=65)
-
-    # 2 subplots side by side: wl vs Psi and wl vs Delta
-    fig, axs = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
-    
-    axs[0].plot(wl_interp, Psi_interp, label=r"$\Psi$ (45°)")
-    axs[0].plot(wl_interp, Psi65_interp, label=r"$\Psi$ (65°)")
-    if config is not None:
-        axs[0].plot(wl_interp, Psi_theory, label=r"$\Psi$ (theory 45°)", linestyle='--')
-        axs[0].plot(wl_interp, Psi_theory65, label=r"$\Psi$ (theory 65°)", linestyle='--')
-    axs[0].set_xlabel("Wavelength (nm)")
-    axs[0].set_ylabel(r"$\Psi$ (°)")
-    axs[0].set_xscale('log')
-    axs[0].legend(loc='upper right')
-    axs[0].set_title(r"$\Psi$ vs Wavelength")
-    axs[0].grid(True)
-
-    axs[1].plot(wl_interp, Delta_interp, label=r"$\Delta$ (45°)")
-    axs[1].plot(wl_interp, Delta65_interp, label=r"$\Delta$ (65°)")
-    if config is not None:
-        axs[1].plot(wl_interp, Delta_theory, label=r"$\Delta$ (theory 45°)", linestyle='--')
-        axs[1].plot(wl_interp, Delta_theory65, label=r"$\Delta$ (theory 65°)", linestyle='--')
-    axs[1].set_xlabel("Wavelength (nm)")
-    axs[1].set_ylabel(r"$\Delta$ (°)")
-    axs[1].set_xscale('log')
-    axs[1].legend(loc='upper right')
-    axs[1].set_title(r"$\Delta$ vs Wavelength")
-    axs[1].grid(True)
-    
+    # Plot 2 - IR Reflectivity
+    plt.figure(figsize=(8, 6))
+    plt.imshow(R_infrared, extent=[aerogel_thicknesses[0], aerogel_thicknesses[-1],
+                                   zns_thicknesses[0], zns_thicknesses[-1]],
+               origin='lower', aspect='auto', cmap='plasma')
+    plt.title(f"Reflectivity Infrared ({num_bilayers} bilayers)")
+    plt.xlabel("Aerogel thickness (µm)")
+    plt.ylabel("ZnS thickness (µm)")
+    plt.colorbar(label="Reflectivity")
     plt.tight_layout()
+    plt.savefig("Output/Aerogel/ZnS_aerogel_reflectivity.png")
+    plt.show()
 
-    if save:
-        plt.savefig("Output/Ellipsometry/ellipsometry.png")
-    else:
-        plt.show()
-    
-    plt.figure(figsize=(10, 6))
-    plt.plot(Delta_interp, Psi_interp, label=r"$\Psi$ (45°)")
-    plt.plot(Delta65_interp, Psi65_interp, label=r"$\Psi$ (65°)")
-    if config is not None:
-        plt.plot(Delta_theory, Psi_theory, label=r"$\Psi$ (theory 45°)", linestyle='--')
-        plt.plot(Delta_theory65, Psi_theory65, label=r"$\Psi$ (theory 65°)", linestyle='--')
-    plt.xlabel(r"$\Delta$ (°)")
-    plt.ylabel(r"$\Psi$ (°)")
-    plt.grid(True)
-    plt.title(r"$\Psi$ vs $\Delta$")
-    if save:
-        plt.savefig("Output/Ellipsometry/ellipsometry_Psi_Delta.png")
-    else:
-        plt.show()
+    # Plot 3 - T_visible × R_IR
+    plt.figure(figsize=(8, 6))
+    plt.imshow(TR_product, extent=[aerogel_thicknesses[0], aerogel_thicknesses[-1],
+                                   zns_thicknesses[0], zns_thicknesses[-1]],
+               origin='lower', aspect='auto', cmap='inferno')
+    plt.title(f"T × R Product ({num_bilayers} bilayers)")
+    plt.xlabel("Aerogel thickness (µm)")
+    plt.ylabel("ZnS thickness (µm)")
+    plt.colorbar(label="T × R")
+    plt.tight_layout()
+    plt.savefig("Output/Aerogel/ZnS_aerogel_TR_product.png")
+    plt.show()
 
-    return wl_interp, Psi_interp, Delta_interp
 
 def Psi_Delta_theory(config, wl, phi0):
     rho = calculate_RTA_multilayer(layers(config, wl), wl, phi0=phi0, ellipsometry=True)
@@ -719,6 +597,219 @@ def Psi_Delta_theory(config, wl, phi0):
     delta = np.angle(rho)
     return np.degrees(psi), np.degrees(delta)
 
+def extract_experimental_ellipsometry():
+    """
+    Extract experimental ellipsometry data from files and return interpolated values.
+    
+    Returns:
+    tuple: (wl_exp, Psi_exp, Delta_exp, Psi65_exp, Delta_exp65) where wavelengths are in micrometers
+    """
+    # Extract data from files
+    Psi45, Delta45 = Extraction.read_and_plot_ellipsometry("Data/FRANCOIS_45.txt",debug=False)
+    Psi65, Delta65 = Extraction.read_and_plot_ellipsometry("Data/FRANCOIS_65.txt",debug=False)
+    
+    return Psi45, Delta45, Psi65, Delta65
+
+def compare_ellipsometry(Psi_exp, Delta_exp, Psi_exp65, Delta_exp65, config, save=False):
+    """
+    Compare experimental ellipsometry data with theoretical values for a given configuration.
+    
+    Parameters:
+    Psi_exp : array-like
+        Experimental Psi values at 45 degrees.
+    Delta_exp : array-like
+        Experimental Delta values at 45 degrees.
+    Psi_exp65 : array-like
+        Experimental Psi values at 65 degrees.
+    Delta_exp65 : array-like
+        Experimental Delta values at 65 degrees.
+    config : list of tuples
+        Configuration of the multilayer system.
+    save : bool, optional
+        If True, saves the plot as an image file.
+    filename : str, optional
+        Filename for saving the plot.
+    """
+    wl = np.linspace(400, 700, 31)
+    Psi_theory, Delta_theory = Psi_Delta_theory(config, wl, phi0=45)
+    Psi_theory_65, Delta_theory_65 = Psi_Delta_theory(config, wl, phi0=65)
+
+    fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+    
+    # Delta vs Wavelength for 45°
+    axs[0, 0].plot(wl, Delta_exp, 'b-', label="Experiment")
+    axs[0, 0].plot(wl, Delta_theory, 'r--', label="Theory")
+    axs[0, 0].set_xlabel("Wavelength (nm)")
+    axs[0, 0].set_ylabel("Delta (deg)")
+    axs[0, 0].set_title("Delta vs Wavelength (45°)")
+    axs[0, 0].grid(True)
+    axs[0, 0].legend(loc='upper right', fontsize=8)
+
+    # Psi vs Wavelength for 45°
+    axs[0, 1].plot(wl, Psi_exp, 'b-', label="Experiment")
+    axs[0, 1].plot(wl, Psi_theory, 'r--', label="Theory")
+    axs[0, 1].set_xlabel("Wavelength (nm)")
+    axs[0, 1].set_ylabel("Psi (deg)")
+    axs[0, 1].set_title("Psi vs Wavelength (45°)")
+    axs[0, 1].grid(True)
+    axs[0, 1].legend(loc='upper right', fontsize=8)
+
+    # Delta vs Wavelength for 65°
+    axs[1, 0].plot(wl, Delta_exp65, 'b-', label="Experiment")
+    axs[1, 0].plot(wl, Delta_theory_65, 'r--', label="Theory")
+    axs[1, 0].set_xlabel("Wavelength (nm)")
+    axs[1, 0].set_ylabel("Delta (deg)")
+    axs[1, 0].set_title("Delta vs Wavelength (65°)")
+    axs[1, 0].grid(True)
+    axs[1, 0].legend(loc='upper right', fontsize=8)
+
+    # Psi vs Wavelength for 65°
+    axs[1, 1].plot(wl, Psi_exp65, 'b-', label="Experiment")
+    axs[1, 1].plot(wl, Psi_theory_65, 'r--', label="Theory")
+    axs[1, 1].set_xlabel("Wavelength (nm)")
+    axs[1, 1].set_ylabel("Psi (deg)")
+    axs[1, 1].set_title("Psi vs Wavelength (65°)")
+    axs[1, 1].grid(True)
+    axs[1, 1].legend(loc='upper right', fontsize=8)
+
+
+    plt.tight_layout(rect=[0, 0, 0.9, 1])
+    if save:
+        filename =''
+        for i, (material, thickness) in enumerate(config):
+            filename += f"{material}_{thickness*1000:.2f}nm-"
+        plt.savefig("Output/Ellipsometry/{}.png".format(filename))
+    else:
+        plt.show()
+
+def fit_oxide_metal_stack_symmetric(
+    Psi_Delta_theory,
+    extract_experimental_ellipsometry,
+    config_template=None,
+    bounds=None,
+    initial_guess=None
+):
+    """
+    Fit the ellipsometry data (Psi, Delta at 45° and 65°) assuming the same oxide thickness above and below the metal layer.
+
+    Parameters:
+    - Psi_Delta_theory: function(config, wl, phi0) → (Psi, Delta)
+    - extract_experimental_ellipsometry: function() → (wl, Psi_45, Delta_45, Psi_65, Delta_65)
+    - config_template: list of (material, thickness)
+    - bounds: list of 2-tuples [(oxide_min, oxide_max), (metal_min, metal_max)]
+    - initial_guess: [oxide_thickness, metal_thickness]
+
+    Returns:
+    - optimized_config: list of (material, thickness)
+    """
+
+    if config_template is None:
+        config_template = [
+            ("air", 0),
+            ("Al2O3", 0.010),  # Top oxide
+            ("Ag", 0.012),     # Metal
+            ("Al2O3", 0.010),  # Bottom oxide (same material)
+            ("glass", 4.0)
+        ]
+
+    if bounds is None:
+        bounds = [(0.001, 4000), (0.001, 4000)]  # µm
+
+    if initial_guess is None:
+        initial_guess = [0.030, 0.012]  # [oxide_thickness, metal_thickness]
+
+    # Load experimental data
+    wl = np.linspace(400, 700, 31)  # Wavelength range in nm
+    Psi_45, Delta_45, Psi_65, Delta_65 = extract_experimental_ellipsometry()
+
+    def objective(thicknesses):
+        oxide_thickness, metal_thickness = thicknesses
+        config = config_template.copy()
+        config[1] = (config[1][0], oxide_thickness)   # top oxide
+        config[2] = (config[2][0], metal_thickness)   # metal
+        config[3] = (config[3][0], oxide_thickness)   # bottom oxide (same thickness)
+
+        psi_45, delta_45 = Psi_Delta_theory(config, wl, phi0=45)
+        psi_65, delta_65 = Psi_Delta_theory(config, wl, phi0=65)
+
+        error = (
+            np.mean((Psi_45 - psi_45)**2) +
+            np.mean((Delta_45 - delta_45)**2) +
+            np.mean((Psi_65 - psi_65)**2) +
+            np.mean((Delta_65 - delta_65)**2)
+        )
+        return error
+
+    result = minimize(
+        objective,
+        initial_guess,
+        bounds=bounds,
+        method='L-BFGS-B',
+        options={'disp': True, 'maxiter': 300}
+    )
+
+    # Update config with optimized thicknesses
+    optimized_config = config_template.copy()
+    optimized_config[1] = (optimized_config[1][0], result.x[0])
+    optimized_config[2] = (optimized_config[2][0], result.x[1])
+    optimized_config[3] = (optimized_config[3][0], result.x[0])
+
+    return optimized_config
+    
+def make_config(number_of_layers, initial_config):
+    """
+    Create a configuration for a multilayer system, of a repeation of a dielectic and a metal layer.
+    The configuration is a list of tuples, where each tuple contains the material name and its thickness.
+    tickness contains the thickness of the dielectric and the metal layer. Config is the initial configuration is a trilayer system.
+    The function returns a list of tuples representing the configuration of the multilayer system.
+    """
+    config = []
+    config.append((initial_config[0]))  # Add the air layer
+    for i in range(number_of_layers):
+        # Add the dielectric layer
+        config.append((initial_config[1]))
+        # Add the metal layer
+        config.append((initial_config[2]))
+    
+    config.append((initial_config[3]))  # Add the glass layer
+    return config
+
+def pourcentage(config, wl, Irradiance, phi0=0):
+    """
+    Calculate the percentage of power reflected and transmitted for a given configuration.
+    
+    Parameters:
+    config : list of tuples
+        Configuration of the multilayer system.
+    wl : array-like
+        Wavelengths in micrometers.
+    Irradiance : array-like
+        Solar irradiance data corresponding to wavelengths.
+    phi0 : float, optional
+        Angle of incidence in degrees (default is 0°).  
+    
+        
+    Returns:
+    tuple : (R_percentage, T_percentage, A_percentage)
+        Percentages of power reflected, transmitted, and absorbed.
+    """
+    # Calculate R, T, A for the given configuration
+    R, T, A = calculate_RTA_multilayer(layers(config, wl), wl, phi0)
+    
+    # Calculate power reflected and transmitted
+    power_reflected = np.trapz(Irradiance * R, wl)
+    power_transmitted = np.trapz(Irradiance * T, wl)
+    power_absorbed = np.trapz(Irradiance * (1 - R - T), wl)
+    
+    # Calculate total power from the sun
+    power_sun = np.trapz(Irradiance, wl)
+    
+    # Calculate percentages
+    R_percentage = (power_reflected / power_sun) * 100
+    T_percentage = (power_transmitted / power_sun) * 100
+    A_percentage = (power_absorbed / power_sun) * 100
+    
+    return R_percentage, T_percentage, A_percentage
 
 
 if __name__ == "__main__":
@@ -727,8 +818,7 @@ if __name__ == "__main__":
     I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt", wl)
     
     
-   
-
+    
 
     power_saving_information= False
     aerogel = False
@@ -739,7 +829,39 @@ if __name__ == "__main__":
     Cu_dielec = False
     Ag_dielec = False
     comparaison_multi = False
-    plot_ten_layer = True
+    plot_ten_layer = False
+    ellipsometry = True
+    if ellipsometry:
+        Psi, Delta, Psi65, Delta65 = extract_experimental_ellipsometry()
+
+        config = [
+            ("air", 0),
+            ("TiO2", 0.05),
+            ("Ag", 0.009),
+            ("TiO2", 0.005),
+            ("glass", 0.5)
+        ]
+
+        d_TiO2, d_Ag, d_TiO2 = optimize_layer_thicknesses(config, wl, I, phi0=0, Spectrum_UV_IR=True)
+        print("Optimized thicknesses: ", d_TiO2, d_Ag, d_TiO2)
+        config = [
+            ("air", 0),
+            ("TiO2", d_TiO2),
+            ("Ag", d_Ag),
+            ("TiO2", d_TiO2),
+            ("glass", 0.5)
+        ]
+        config_ACG = fit_oxide_metal_stack_symmetric(Psi_Delta_theory, extract_experimental_ellipsometry, config_template=config)
+        print("Optimized configuration: ", config_ACG)
+        compare_ellipsometry(Psi, Delta, Psi65, Delta65, config, save = True)
+
+        R_pourcentage, T_pourcentage, A_pourcentage = pourcentage(config, wl, I, phi0=0)
+        print(f"Reflectance: {R_pourcentage:.2f}%")
+        print(f"Transmittance: {T_pourcentage:.2f}%")
+        print(f"Absorbance: {A_pourcentage:.2f}%")
+        
+        
+
 
     if plot_ten_layer:
         config = create_aerogel_dielectric_multilayer(10, 0.3, 0.3)
@@ -1054,12 +1176,7 @@ if __name__ == "__main__":
     #10 bilayer of ZnS/Air 
     if aerogel:
         print("Optimizing the thicknesses of the aerogel system")
-        config = [
-            ("air", 0),
-            ("ZnS", 0.01),
-            ("aerogel", 0.01),
-            ("glass", 0.5)
-        ]
+        wl = np.linspace(0.2, 20, 1000)
         explore_multilayer_performance(wl, num_bilayers=10)
     
     
