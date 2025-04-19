@@ -1,17 +1,17 @@
 # LMAPR2001
-## Module 3 LCA
-## Module 4 Video 
+# Module 3 LCA
+# Module 4 Video 
 
 
-## Module 5
+# Module 5
 
 ## Task 1 
 - Introduction to the Module 5 
 - Characterization of the sun spectra 
-    - [ ] Descripte the resource
-    - [ ] All the three spectrum 
-    - [ ] Black Body 
-    - [ ] The Absorption in the atmosphere 
+    - [x] Describe the resource
+    - [x] All the three spectrum 
+    - [x] Black Body 
+    - [x] The Absorption in the atmosphere 
 
 - Introduction to antisolar window 
 - Basic Optics concepts 
