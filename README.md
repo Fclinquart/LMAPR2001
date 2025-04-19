@@ -34,18 +34,18 @@ of the materials
 
 ## Task 2
 - Air Silver Glass : Oprical Properties 
-    -[x] Explain the computation from the Bashara 
-    -[ ] Make multiple plot for 1, 10, 50, 100 nm of R T A + explain 
-    -[ ] Plot Optimal R, T, A 
-    -[ ] Plot Optimal R, T, A for the solar Noon
-    -[ ] Explain the properties of the bilayer + the small thickness 
+    - [x] Explain the computation from the Bashara 
+    - [ ] Make multiple plot for 1, 10, 50, 100 nm of R T A + explain 
+    - [ ] Plot Optimal R, T, A 
+    - [ ] Plot Optimal R, T, A for the solar Noon
+    - [ ] Explain the properties of the bilayer + the small thickness 
 
     
 - Position of sun in the sky 
-    -[ ] Make that more clear 
+    - [ ] Make that more clear 
 
 - Ellipsometry 
-    -[ ] add the FTIR
-    -[ ] make the Wiki more reable
+    - [ ] add the FTIR
+    - [ ] make the Wiki more reable
 
 
