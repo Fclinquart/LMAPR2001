@@ -699,13 +699,56 @@ def read_plot_FTIR(filename):
     plt.savefig("Output/FTIR/Sample1_FTIR_log.png")
 
 
+def plot_semi_infite_layer(wl, n1, phi0 =0, n0 =1, title = None):
+    R = reflectivity_semi_infinite_layer(n0, n1, phi0)
+    plt.figure(figsize=(10,8))
+    plt.plot(wl,R,linewidth=2, color='black')
+    plt.xlabel("Wavelength (µm)")
+    plt.ylabel("Reflectivity at {}°".format(phi0))
+    plt.xscale('log')
+    plt.axvspan(wl[0], 0.4, color="purple", alpha=0.05, label="UV Spectrum")
+    plt.axvspan(0.4,0.7, color = "yellow", alpha =0.05, label = "visible")
+    plt.axvspan(0.7, wl[-1], color = "red", alpha =0.05, label = "IR")
+    plt.legend(loc ="upper left",fontsize = 8)
+    if title is not None : 
+        plt.savefig("Output/{}.png".format(title))
+    else:
+        plt.show()
 
+def plot_semi_infinite_layer_in_function_of_phi(wl,n1,phi0:list = None,n0 =1, title = None):
+    if phi0 is None:
+        phi0 = [0,35,70]
+    for phi in phi0:
+        R = reflectivity_semi_infinite_layer(n0,n1,phi)
+        plt.plot(wl,R, linewidth =2, label = "{}°".format(phi))
 
-
+    plt.xlabel("Wavelength (µm)")
+    plt.ylabel("Reflectivity ")
+    plt.xscale('log')
+    
+    plt.xlim(0.2,25)
+    plt.legend(loc ="upper left",fontsize = 8)
+    if title is not None : 
+        plt.savefig("Output/{}.png".format(title))
+    else:
+        plt.show()
+               
 
 if __name__ == "__main__":
     print ("Task 2 :")
-    filename = "Data/n_k_combined.txt"
+    filename = "Data/n_k_glass.txt"
+
+    wl, n, k = n_k(filename)
+    n1 = n-1j*k
+
+    plot_semi_infite_layer(wl, n1, title='Glass_spectrum')
+    plot_semi_infinite_layer_in_function_of_phi(wl,n1,title="Glass_phi")
+
+
+    wl, n, k = n_k(filename= "Data/n_k_ag2.txt")
+    n1 = n-1j*k
+    plot_semi_infite_layer(wl, n1, title= 'Silver reflectivity')
+    plot_semi_infinite_layer_in_function_of_phi(wl,n1,title="Ag_phi")
     
 
 

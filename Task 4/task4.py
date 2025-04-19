@@ -1,6 +1,74 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import Extraction
+import sys 
+import os
+import scipy.optimize as opt
+from scipy.optimize import minimize
+import task3 # type: ignore
+
+def snells(n0, n1, phi0):
+    """
+    Calculate the angle of refraction using Snell's law.
+
+    Parameters:
+    n0 (float): Refractive index of the first medium.
+    n1 (float): Refractive index of the second medium.
+    phi0 (float): Angle of incidence in degrees.
+
+    Returns:
+    float: Angle of refraction in degrees.
+    """
+    print("Task 1 : Calculating angle of refraction...")
+    phi0 = np.radians(phi0)
+    phi1 = np.arcsin(n0 * np.sin(phi0) / n1)
+    return phi1
+
+def snells_law(n0, n1, n2, phi0):
+    """
+    Calculate the angle of refraction using Snell's law for two interfaces.
+
+    Parameters:
+    n0 (float): Refractive index of the first medium.
+    n1 (float): Refractive index of the second medium.
+    n2 (float): Refractive index of the third medium.
+    phi0 (float): Angle of incidence in degrees.
+
+    Returns:
+    tuple: A tuple containing:
+        - phi1 (float): Angle of refraction at the first interface in degrees.
+        - phi2 (float): Angle of refraction at the second interface in degrees.
+    """
+    print("Task 2 : Calculating angle of refraction...")
+    phi0 = np.radians(phi0)
+    phi1 = np.arcsin(n0 * np.sin(phi0) / n1)
+    phi2 = np.arcsin(n0 * np.sin(phi0) / n2)
+    return phi1, phi2
+
+def reflectivity_semi_infinite_layer(n0, n1, phi0):
+    """
+    Calculate the reflectivity of a semi-infinite layer.
+
+    Parameters:
+    n0 (float): Refractive index of the first medium.
+    n1 (float): Refractive index of the second medium.
+    phi0 (float): Angle of incidence in degrees.
+
+    Returns:
+    float: Reflectivity of the material.
+    """
+   
+    phi0 = np.radians(phi0)
+    phi1 = snells(n0, n1, phi0)
+    
+    # Calculate the reflection coefficients for s- and p-polarized light
+    r_s = (n0 * np.cos(phi0) - n1 * np.cos(phi1)) / (n0 * np.cos(phi0) + n1 * np.cos(phi1))
+    r_p = (n1 * np.cos(phi0) - n0 * np.cos(phi1)) / (n1 * np.cos(phi0) + n0 * np.cos(phi1))
+    
+    # Calculate the reflectivity as the average of |r_s|^2 and |r_p|^2
+    R = (np.abs(r_s)**2 + np.abs(r_p)**2) / 2
+        
+    return R
 
 
 def plot_solar_spectrum(filename, filename_2=None, filename_3=None, save=False):
@@ -68,20 +136,26 @@ def Extract_n_k(material, wl_interp):
         "glass": "Data/Glass_Palik.txt",
         "Ag": "Data/Ag_Hagemann.txt",
         "TiO2": "Data/TiO2_Franta.txt",
-        "SiO2": "Data/Glass_Palik.txt",
+        "SiO2": "Data/SiO2_Franta.txt",
         "Al": "Data/Al_rakic.txt",
         "PMMA": "Data/PMMA_Zhang.txt",
         "ZnO": "Data/ZnO_Bond.txt",
         "VO2": "Data/VO2_Beaini.txt",
+        "SiO": "Data/SiO_Hass.txt",
+        "MgF2": "Data/MgF2_Franta.txt",
+        "PC": "Data/PC_Zhang.txt",
+        "PDMS": "Data/PDMS_Zhang.txt",
+        "PVC": "Data/PVC_Zhang.txt",
+        "SiC": "Data/SiC.txt",
+        "Si3N4":"Data/Si3N4.txt",
+        "In":"Data/In.txt",
+
     }
 
     # Check if the material is in the dictionary
     if material not in material_files:
         raise ValueError(f"Material '{material}' is not supported.")
-    # Load the material data
-    wl, n, k = Extraction.extract_wl_n_k(material_files[material])
-    # Interpolate n and k values to match the wavelength range
-    return Extraction.interpolate(wl_interp,wl, n, k)
+    return Extraction.extract_nk(material_files[material], wl_interp)
 
 def calculate_refractive_index_air(wl, plot=False):
     """
@@ -187,13 +261,112 @@ def plot_solar_irrandiance_vs_black_body(filename, filename2, wl, T, thetha):
     plt.legend(loc='upper right', fontsize='small')
     plt.savefig('Output/Black_Body/solar_irradiance_vs_black_body.png', dpi=300)
 
+def plot_n_k(material_list, wl_interp, log=False):
+    """
+    Plot the refractive index (n) and extinction coefficient (k) for a list of materials in separate subplots.
+    
+    Parameters:
+        material_list (list): List of strings containing material names.
+        wl_interp (numpy.ndarray): Wavelengths in nm.
+        log (bool): If True, plot on a logarithmic scale.
+    
+    Returns:
+        None
+    """
+    fig, axs = plt.subplots(2, 1, figsize=(10, 12), sharex=True)
 
+    colors = plt.cm.tab10(np.linspace(0, 1, len(material_list)))  # Generate distinct colors for each material
+
+    for idx, material in enumerate(material_list):
+        n, k = Extract_n_k(material, wl_interp)
+        
+        
+        # Plot refractive index (n)
+        axs[0].plot(wl_interp, n, label='{}'.format(material), linewidth=2, color=colors[idx])
+        
+        # Plot extinction coefficient (k)
+        axs[1].plot(wl_interp, k, label='{}'.format(material), linewidth=2, color=colors[idx])
+
+    if log:
+        axs[0].set_xscale('log')
+        axs[1].set_xscale('log')
+        axs[0].set_yscale('log')
+        
+
+
+    axs[0].set_ylabel('Refractive Index (n)')
+    axs[1].set_ylabel('Extinction Coefficient (k)')
+    axs[1].set_xlabel('Wavelength (nm)')
+
+    axs[0].axvspan(8, 13, color='yellow', alpha=0.1)
+    axs[1].axvspan(8, 13, color='yellow', alpha=0.1)
+
+    axs[0].legend(loc='upper left', fontsize='small')
+    
+    plt.tight_layout()
+    plt.savefig('Output/Choice/refractive_index_and_extinction_coefficient.png', dpi=300)
+    plt.show()
+
+def plot_transmittance_semi_infinite_layer(material_list, wl):
+    """
+    Plot the transmittance of a semi-infinite layer for a list of materials.
+
+    Parameters:
+        material_list (list): List of strings containing material names.
+        wl (numpy.ndarray): Wavelengths in nm.
+
+    Returns:
+        None
+    """
+    plt.figure(figsize=(10, 6))
+    colors = plt.cm.tab10(np.linspace(0, 1, len(material_list)))  # Generate distinct colors for each material
+
+    for idx, material in enumerate(material_list):
+        n, k = Extract_n_k(material, wl)
+        n_air = calculate_refractive_index_air(wl)
+        phi0 = 0  # Normal incidence
+        R = reflectivity_semi_infinite_layer(n_air, n + 1j * k, phi0)
+        T = 1 - R  # Transmittance is 1 - Reflectance
+        plt.plot(wl, T, label=material, linewidth=2, color=colors[idx])
+
+    plt.xlabel('Wavelength (nm)')
+    plt.ylabel('Transmittance')
+    plt.axvspan(8, 13, color='yellow', alpha=0.1)
+    plt.xscale("log")
+    plt.title('Transmittance of Semi-Infinite Layers')
+    plt.legend(loc='upper right', fontsize='small')
+    
+    plt.tight_layout()
+    plt.savefig('Output/Choice/transmittance_semi_infinite_layer.png', dpi=300)
+    plt.show()
+
+    
     
     
 
 
 if __name__ == "__main__":
-    wl = np.linspace(0.2, 20, 100000)
-    plot_black_body_spectrum(wl, [-50,25,100], 0)
-    plot_solar_irrandiance_vs_black_body('Data/ASTM0.txt', 'Data/ASTM1.5Global.txt', wl, 6000,0)
+    wl = np.linspace(0.2, 50, 10000)
+    I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt",wl)
+    n,k =Extract_n_k("SiO", wl)
+    print("n: ", n)
+    print("k: ", k)
+    
+
+    material = [ "PMMA", "PC", "PDMS", "PVC","SiC", "SiO", "SiO2","Si3N4"]
+    
+    config =[
+        ('air',0),
+       
+        ('PVC',0.025),
+        ('SiO',0.025),
+        ('In',0.001),
+        ('PVC',0.025),
+        ('SiO',0.025),
+        ("glass",0.025)
+
+    ]
+
+    task3.plot_R_T_A_fixed_phi0_and_d_multilayer(config,wl,True)
+    
     

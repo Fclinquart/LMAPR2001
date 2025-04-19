@@ -232,3 +232,46 @@ def extract_spectral_data(file_path, phi0 = 45):
             
     return wl[:-2], Psi[:-2], Delta[:-2]
 
+from scipy.interpolate import interp1d
+
+def extract_nk(filename, wl_interp):
+    import numpy as np
+    import pandas as pd
+    from scipy.interpolate import interp1d
+
+    if filename == "Data/Glass_Palik.txt":
+        wl, n, k = task2.n_k(filename)
+        return interpolate(wl_interp,wl,n,k)
+
+    # Lire toutes les lignes
+    with open(filename, "r") as f:
+        lines = f.readlines()
+
+    # Trouver l’index du 2ᵉ header (où la colonne 'wl' recommence pour k)
+    second_table_start = None
+    for i, line in enumerate(lines):
+        if line.strip() == "wl\tk":
+            second_table_start = i
+            break
+                
+    if second_table_start is None:
+        raise ValueError("Impossible de trouver le deuxième tableau (wl-k) dans le fichier.")
+
+    # Lire les deux tableaux avec pandas
+    n_data = pd.read_csv(filename, sep="\t", skiprows=1, nrows=second_table_start - 2, names=["wl", "n"])
+    k_data = pd.read_csv(filename, sep="\t", skiprows=second_table_start + 1, names=["wl", "k"])
+
+    # Convertir en float (sécurité)
+    n_data = n_data.astype(float)
+    k_data = k_data.astype(float)
+
+    # Créer les fonctions d'interpolation
+    n_interp_func = interp1d(n_data["wl"], n_data["n"], kind='linear', bounds_error=False, fill_value="extrapolate")
+    k_interp_func = interp1d(k_data["wl"], k_data["k"], kind='linear', bounds_error=False, fill_value="extrapolate")
+
+    # Appliquer l'interpolation
+    n_interp = n_interp_func(wl_interp)
+    k_interp = k_interp_func(wl_interp)
+
+    return n_interp, k_interp
+
