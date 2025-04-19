@@ -1,80 +1,31 @@
 # LMAPR2001
+## Module 3 LCA
+## Module 4 Video 
+
 
 ## Module 5
 
-### Clôturer LCA 1
+## Task 1 
+- Introduction to the Module 5 
+- Characterization of the sun spectra 
+    - [ ] Descripte the resource
+    - [ ] All the three spectrum 
+    - [ ] Black Body 
+    - [ ] The Absorption in the atmosphere 
 
-- [ ] Finir goal et scope (bien spécifier la fonctional unit + mettre au clair le scope)
-- [ ] Faire un beau référence flow (attention bien complet : entrée, sortie, méthode + recherche doc)
+- Introduction to antisolar window 
+- Basic Optics concepts 
+    - [ ] The complex index of refraction 
+    
+- Air - semi inifte layer : Optical Properties 
+    - [ ] Compute R : lot these data in graphs together with the index of refraction of your materials in the same
+range
+    - [ ] explain the main features of this graph with respect to the electronic and vibrational properties
+of the materials
 
-### Clôturer la task 1
 
-- [ ] Calculer ad inibo
-- [ ] Étude de la convergence
-
-### Pour dimanche 30/03 
-- [ ] Reinterpereter les graphes (résonance avec Palik ou le livre de Fox) + ajout Graphes 
-- [ ] remettre le graphe en log/log de n et k avce plot_n_k()
-- [ ] Remttre une section sur l'importance des données, des conditions expérimentales, mettre sur un plot log/log n et $\kappa$ pour plusieur donnée (Hagemann, Palik,...)
-**NB : Après tout nos graphe avec l'argent sont basé sur Hagemann et al 1974**
-- [ ] Faire un beau wiki, avec des titres, une bibliographie et avec une cohérence dans les articles
-
-### Clôturer la task 2
-
-- [X] Vérifier si T est bon
-- [X] Calculer la Puissance du Rayonnement solaire $1 \frac{W}{m²}$
-- [X] Calculer le produit $F_{transmitted}$ et $F_{reflected}$ et l'optimiser pour trouver d
-- [X] Plotter $F_{transmitted}$ et $F_{reflected}$ en fonction de d + Discussion
-- [X] Reprendre le AMST 1.5
-- [X] Refaire les plot en fontion de la puissance en fonction du spectre
-- [X] Refaire l'Optimisation
-### Pour dimanche 30/03 
-- [ ] remplacer tout les graphes 
-- [ ] explication avec le livre de Fox 
-- [ ] Mettre les plot pourcentage visible vs IR 
-- [ ] Expliquer l'optimisation pour trouver d 
-- [ ] Interpretation quels sont les limites de la technologie 
-- [ ] Plotter + discussion pour le 21 juin 12h à Bruxelles
-- [ ] le FTIR 
-- [ ] Calculer d avec UV spectroscopie
-- [ ] Remetrre les graphes et reinterpréte les graphes
-- [ ] Faire un beau wiki, avec des titres, une bibliographie et avec une cohérence dans les articles
-
-### task 3
-
-- [x] prendre RDV pour spectroscopie
-- [ ] use ellipsometry and infrared spectroscopy to characterize their performance.
-
-- [x] Write a program to compute the optical transmission and reflection by multilayered structures for any angle of incidence, and use it to explore how it is possible to transmit as much light as possible in the visible range while reflecting the rest of the solar spectrum
-- [ ] estimate the electricity you will spare for air-conditioning
-- [ ] Aero-gel
-- [ ] Faire une function qui merge 2 fichier .txt en un pour utiliser plus de donner 
-
-##### Question
-- n-1j ou n+1j 
-
-#### remarques :
-
-- Erreur T venant du correction factor :
-  -[x]**A corriger**
-- Check si le calcul d'intensité est cohérent
-  - ne pas le faire avec $I_0$ mais avec le vrai spectre su soleil *Fait*
-
-# Module 3 :  ACV
-
-- [X] **urgent** Se dispatcher le travail
-
-## To Do Personnelles
-
-## François
-
-## Jeremy
-
-## Merlin
-
-- [ ] Comprendre les codes task 2 de François
-- [X] Les modifier (T ou A probablement faux)
-- [ ] Reinterpereter les graphes + ajout Graphes **Dimanche**
-- [ ] remettre le graphe en log/log de n et k avce plot_n_k() **Dimanche**
-- [ ] Remetrre les graphes et reinterpréte les graphes
-- [ ] Plotter + discussion pour le 21 juin 12h à Bruxelles
+- Ad initio computation of complex refrcation index 
+    - [ ] @ToDo with Noam
+    - [ ] understand the computation using LMAPR1491 and 1492 
+    - [ ] Comparison between theory and experiment 
+    - [ ] Convergence Rate 
