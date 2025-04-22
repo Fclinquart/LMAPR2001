@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
+import string
 
 # Standardize plot settings
 plt.rcParams.update({
@@ -191,9 +191,10 @@ def compute_R_T_circular(n0, n1, n2, d1, wavelength, phi0):
 
     return R, correction_factor * T, A
 
-def plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, title="", save=False):
+def plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, title="", save=False, I=None):
     """
-    Plot reflectivity, transmissivity, and absorbance for fixed angle of incidence and thickness.
+    Plot reflectivity, transmissivity, and absorbance for fixed angle of incidence and thickness,
+    along with the solar irradiance spectrum.
 
     Parameters:
     n0 (float): Refractive index of air.
@@ -204,23 +205,51 @@ def plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d1, lambda_um, phi0, title="", save=
     phi0 (float): Angle of incidence in degrees.
     title (str): Title of the plot.
     save (bool): Whether to save the plot as a file.
+    I (numpy.ndarray): Solar irradiance values (optional).
     """
     R, T, A = compute_R_T_circular(n0, n1, n2, d1, lambda_um, phi0)
-    plt.figure(figsize=(10, 6))
-    plt.plot(lambda_um, R, label="Reflectivity")
-    plt.plot(lambda_um, T, label="Transmissivity")
-    plt.plot(lambda_um, A, label="Absorbance")
-    plt.xlabel("Wavelength (µm)")
-    plt.xscale('log')
-    plt.axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
-    plt.axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
-    plt.axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
-    plt.ylabel("R, T, A")
-    plt.legend()
+
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+
+    # Plot R, T, A on the first y-axis
+    # Define a custom markevery rule: dense at the beginning, sparse at the end
+    def custom_markevery(x):
+        d = []
+        for i in range(len(x)):
+            if i < 500:
+                d.append(1)
+            else:
+                d.append(100)
+        return d
+
+    ax1.plot(lambda_um, R, label="Reflectivity", color="black", marker="o", markersize=5, markerfacecolor="white", markevery=custom_markevery(lambda_um))
+    ax1.plot(lambda_um, T, label="Transmissivity", color="black", marker="s", markersize=5, markerfacecolor="white", markevery=custom_markevery(lambda_um))
+    ax1.plot(lambda_um, A, label="Absorbance", color="black", marker="D", markersize=5, markerfacecolor="white", markevery=custom_markevery(lambda_um))
+    ax1.set_xlabel("Wavelength (µm)", fontsize=12)
+    ax1.set_xscale('log')
+    ax1.axvspan(0.4, 0.7, color="yellow", alpha=0.05)
+    ax1.axvspan(0.2, 0.4, color="purple", alpha=0.05)
+    ax1.axvspan(0.7, 20, color="red", alpha=0.05)
+    ax1.set_ylabel("R, T, A (%)", fontsize=12)
+
+    # Plot solar irradiance on the second y-axis if provided
+    if I is not None:
+        ax2 = ax1.twinx()
+        ax2.plot(lambda_um, I , label="Solar Irradiance", color="orange", linestyle="--")
+        ax2.set_ylabel("Solar Irradiance (W/m²/µm)", fontsize=12)
+
+    # Combine legends from both axes
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    if I is not None:
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc="lower right", fontsize=10)
+    else:
+        ax1.legend(loc="lower right", fontsize = 10)
+
     if title != "":
         plt.title(title)
     if save:
-        plt.savefig("Output/RTA_phi0_d/RTA_phi0_{}nm_{}.png".format(d1 * 1e3, phi0))
+        plt.savefig("Output/RTA_phi0_d/RTA_phi0_{:.1f}nm_{}.png".format(d1 * 1e3, phi0))
     else:
         plt.show()
 
@@ -433,7 +462,7 @@ def spectral_RTA(spectrum: str, lambda_um, n0, n1, n2, d_list: list, phi0, Irrad
 
 def plot_I_vs_d(lambda_um, n0, n1, n2, d_list, phi0, Irradiance):
     """
-    Plot the reflectivity, transmissivity, and absorbance versus thickness for different spectra.
+    Plot the reflectivity, transmissivity, and absorbance versus thickness for different spectra in a single figure with subplots.
 
     Parameters:
     lambda_um (numpy.ndarray): Wavelengths in micrometers.
@@ -444,52 +473,54 @@ def plot_I_vs_d(lambda_um, n0, n1, n2, d_list, phi0, Irradiance):
     phi0 (float): Angle of incidence in degrees.
     Irradiance (numpy.ndarray): Solar irradiance values.
     """
+    fig, axs = plt.subplots(2, 2, figsize=(12, 10), sharex=True)
+    axs = axs.flatten()
+    markers = ['-', '--', '-.', ':']
+
     # UV spectrum
     R_UV, T_UV, A_UV = spectral_RTA('UV', lambda_um, n0, n1, n2, d_list, phi0, Irradiance)
-    plt.figure(figsize=(10, 6))
-    plt.plot(d_list, R_UV, label="Reflectivity (UV Spectrum)")
-    plt.plot(d_list, T_UV, label="Transmissivity (UV Spectrum)")
-    plt.plot(d_list, A_UV, label="Absorbance (UV Spectrum)")
-    plt.xlabel("Thickness (µm)")
-    plt.xscale('log')
-    plt.ylabel("R, T, A (%)")
-    plt.legend()
-    plt.savefig("Output/Fraction_of_spectra_vs_thickness/UV.png")
+    axs[0].plot(d_list, R_UV, label="Reflectivity (UV)", linestyle=markers[0], linewidth=0.75, color="black")
+    axs[0].plot(d_list, T_UV, label="Transmissivity (UV)", linestyle=markers[1], linewidth=0.75, color="black")
+    axs[0].plot(d_list, A_UV, label="Absorbance (UV)", linestyle=markers[2], linewidth=0.75, color="black")
+    axs[0].set_ylabel("R, T, A (%) Ultraviolet", fontsize=12)
+    axs[0].set_xscale('log')
+    axs[0].text(-0.1, 1.1, string.ascii_uppercase[0], transform=axs[0].transAxes, size=20, weight='bold', family='sans-serif')
 
     # Visible spectrum
     R_Visible, T_Visible, A_Visible = spectral_RTA('Visible', lambda_um, n0, n1, n2, d_list, phi0, Irradiance)
-    plt.figure(figsize=(10, 6))
-    plt.plot(d_list, R_Visible, label="Reflectivity (Visible Spectrum)")
-    plt.plot(d_list, T_Visible, label="Transmissivity (Visible Spectrum)")
-    plt.plot(d_list, A_Visible, label="Absorbance (Visible Spectrum)")
-    plt.xlabel("Thickness (µm)")
-    plt.xscale('log')
-    plt.ylabel("R, T, A (%)")
-    plt.legend()
-    plt.savefig("Output/Fraction_of_spectra_vs_thickness/Visible.png")
+    axs[1].plot(d_list, R_Visible, label="Reflectivity (Visible)", linestyle=markers[0], linewidth=0.75, color="black")
+    axs[1].plot(d_list, T_Visible, label="Transmissivity (Visible)", linestyle=markers[1], linewidth=0.75, color="black")
+    axs[1].plot(d_list, A_Visible, label="Absorbance (Visible)", linestyle=markers[2], linewidth=0.75, color="black")
+    axs[1].set_ylabel("R, T, A (%) Visible", fontsize= 12)
+    axs[1].set_xscale('log')
+    axs[1].text(-0.1, 1.1, string.ascii_uppercase[1], transform=axs[1].transAxes, size=20, weight='bold', family='sans-serif')
 
     # IR spectrum
     R_IR, T_IR, A_IR = spectral_RTA('IR', lambda_um, n0, n1, n2, d_list, phi0, Irradiance)
-    plt.figure(figsize=(10, 6))
-    plt.plot(d_list, R_IR, label="Reflectivity (IR Spectrum)")
-    plt.plot(d_list, T_IR, label="Transmissivity (IR Spectrum)")
-    plt.plot(d_list, A_IR, label="Absorbance (IR Spectrum)")
-    plt.xlabel("Thickness (µm)")
-    plt.xscale('log')
-    plt.ylabel("R, T, A (%)")
-    plt.legend()
-    plt.savefig("Output/Fraction_of_spectra_vs_thickness/IR.png")
+    axs[2].plot(d_list, R_IR, label="Reflectivity (IR)", linestyle=markers[0], linewidth=0.75, color="black")
+    axs[2].plot(d_list, T_IR, label="Transmissivity (IR)", linestyle=markers[1], linewidth=0.75, color="black")
+    axs[2].plot(d_list, A_IR, label="Absorbance (IR)", linestyle=markers[2], linewidth=0.75, color="black")
+    axs[2].set_xlabel("Thickness (µm)", fontsize=8)
+    axs[2].set_ylabel("R, T, A (%) Infrared", fontsize=12)
+    axs[2].set_xscale('log')
+    axs[2].text(-0.1, 1.1, string.ascii_uppercase[2], transform=axs[2].transAxes, size=20, weight='bold', family='sans-serif')
 
-    # visible vs IR
-    plt.figure(figsize=(10, 6))
-    plt.plot(d_list, T_Visible, label="Transmissivity (Visible Spectrum)")
-    plt.plot(d_list, R_IR, label="Reflectivity (IR Spectrum)")
-    plt.xlabel("Thickness (µm)")
-    plt.xscale('log')
-    plt.ylabel("R, T (%)")
-    plt.vlines(Optimal_thickness(d_list, lambda_um, n0, n1, n2, phi0, Irradiance), 0, 100, color="red", label="Optimal thickness")
-    plt.legend()
-    plt.savefig("Output/Fraction_of_spectra_vs_thickness/Visible_IR.png")
+    # Visible vs IR
+    axs[3].plot(d_list, T_Visible, label="Transmissivity ", linestyle=markers[0], linewidth=0.75, color="black")
+    axs[3].plot(d_list, R_IR, label="Reflectivity ", linestyle=markers[1], linewidth=0.75, color="black")
+    optimal_thickness = Optimal_thickness(d_list, lambda_um, n0, n1, n2, phi0, Irradiance)
+    axs[3].vlines(optimal_thickness, 0, 100, color="red", label="Optimal thickness {:.1f} nm".format(optimal_thickness * 1e3), linestyle='--')
+    axs[3].set_xlabel("Thickness (µm)", fontsize=8)
+    axs[3].set_ylabel("R, T (%) Visble Transmittance vs Infrared Reflectivity", fontsize=12)
+    axs[3].set_xscale('log')
+    axs[3].text(-0.1, 1.1, string.ascii_uppercase[3], transform=axs[3].transAxes, size=20, weight='bold', family='sans-serif')
+
+    # Add a single legend for all subplots
+    handles, labels = axs[3].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower right', fontsize=12, frameon=True)
+
+    plt.tight_layout()
+    plt.savefig("Output/Fraction_of_spectra_vs_thickness/Combined.png")
 
 def plot_R_T_A_vs_d(lambda_um, n0, n1, n2, d_list, phi0):
     """
@@ -504,37 +535,45 @@ def plot_R_T_A_vs_d(lambda_um, n0, n1, n2, d_list, phi0):
     phi0 (float): Angle of incidence in degrees.
     """
     fig, axs = plt.subplots(3, 1, figsize=(10, 18), sharex=True)
-
+    count = 0
+    markers = ['o', 's', 'D', '^', 'v', 'x', '+', '*']
     for d in d_list:
         R, _, _ = compute_R_T_circular(n0, n1, n2, d, lambda_um, phi0)
-        axs[0].plot(lambda_um, R, label=f"d = {d * 1e3:.2f} nm")
-    axs[0].set_ylabel("Reflectivity")
+        axs[0].plot(lambda_um, R, label=f"d = {d * 1e3:.2f} nm", linewidth=0.75, color = "black", marker=markers[count], markersize=10, markerfacecolor="white", markevery = 5)
+        count += 1
+    axs[0].set_ylabel("Reflectivity", fontsize=12)
     axs[0].set_xscale('log')
-    axs[0].legend()
-    axs[0].axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
-    axs[0].axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
-    axs[0].axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
-
+    axs[0].legend(loc='lower right', fontsize=12)
+    axs[0].axvspan(0.4, 0.7, color="yellow", alpha=0.05, label="Visible Spectrum")
+    axs[0].axvspan(0.2, 0.4, color="purple", alpha=0.05, label="UV Spectrum")
+    axs[0].axvspan(0.7, 20, color="red", alpha=0.05, label="IR Spectrum")
+    axs[0].text(-0.1, 1.1, string.ascii_uppercase[0], transform=axs[0].transAxes, 
+            size=20, weight='bold')
+    count = 0
     for d in d_list:
         _, T, _ = compute_R_T_circular(n0, n1, n2, d, lambda_um, phi0)
-        axs[1].plot(lambda_um, T, label=f"d = {d * 1e3:.2f} nm")
-    axs[1].set_ylabel("Transmissivity")
+        axs[1].plot(lambda_um, T, label=f"d = {d * 1e3:.2f} nm", linewidth=0.75, color = "black", marker=markers[count], markersize=10, markerfacecolor="white", markevery = 5)
+        count += 1
+    axs[1].set_ylabel("Transmissivity", fontsize=12)
     axs[1].set_xscale('log')
-    axs[1].legend()
-    axs[1].axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
-    axs[1].axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
-    axs[1].axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
-
+    axs[1].axvspan(0.4, 0.7, color="yellow", alpha=0.05)
+    axs[1].axvspan(0.2, 0.4, color="purple", alpha=0.05)
+    axs[1].text(-0.1, 1.1, string.ascii_uppercase[1], transform=axs[1].transAxes, 
+            size=20, weight='bold')
+    axs[1].axvspan(0.7, 20, color="red", alpha=0.05)
+    count = 0
     for d in d_list:
         _, _, A = compute_R_T_circular(n0, n1, n2, d, lambda_um, phi0)
-        axs[2].plot(lambda_um, A, label=f"d = {d * 1e3:.2f} nm")
-    axs[2].set_xlabel("Wavelength (µm)")
-    axs[2].set_ylabel("Absorbance")
+        axs[2].plot(lambda_um, A, label=f"d = {d * 1e3:.2f} nm", linewidth=0.75, color = "black", marker=markers[count], markersize=10, markerfacecolor="white", markevery = 5)
+        count += 1
+    axs[2].set_xlabel("Wavelength (µm)", fontsize=12)
+    axs[2].set_ylabel("Absorbance", fontsize=12)
     axs[2].set_xscale('log')
-    axs[2].legend()
-    axs[2].axvspan(0.38, 0.8, color="yellow", alpha=0.2, label="Visible Spectrum")
-    axs[2].axvspan(0.2, 0.38, color="purple", alpha=0.2, label="UV Spectrum")
-    axs[2].axvspan(0.8, 20, color="red", alpha=0.2, label="IR Spectrum")
+    axs[2].axvspan(0.4, 0.7, color="yellow", alpha=0.05)
+    axs[2].axvspan(0.2, 0.4, color="purple", alpha=0.05)
+    axs[2].axvspan(0.7, 20, color="red", alpha=0.05)
+    axs[2].text(-0.1, 1.1, string.ascii_uppercase[2], transform=axs[2].transAxes, 
+            size=20, weight='bold')
 
     plt.tight_layout()
     plt.savefig("Output/RTA_vs_d/RTA_combined_{}.png".format(phi0))
@@ -736,21 +775,27 @@ def plot_semi_infinite_layer_in_function_of_phi(wl,n1,phi0:list = None,n0 =1, ti
 
 if __name__ == "__main__":
     print ("Task 2 :")
-    filename = "Data/n_k_glass.txt"
+    filename = "Data/n_k_combined.txt"
 
-    wl, n, k = n_k(filename)
-    n1 = n-1j*k
+    wl, n0, n1, n2 = refraction_index(filename)
+    
+    plot_R_T_A_vs_d(wl, n0, n1, n2, [1e-3, 10e-3, 50e-3,100e-3], 0)
 
-    plot_semi_infite_layer(wl, n1, title='Glass_spectrum')
-    plot_semi_infinite_layer_in_function_of_phi(wl,n1,title="Glass_phi")
+    I = Solar_spectrum(filename)
+    d_list = np.linspace(0, 100e-3, 10000)
 
-
-    wl, n, k = n_k(filename= "Data/n_k_ag2.txt")
-    n1 = n-1j*k
-    plot_semi_infite_layer(wl, n1, title= 'Silver reflectivity')
-    plot_semi_infinite_layer_in_function_of_phi(wl,n1,title="Ag_phi")
+    
     
 
 
 
+    d = 8.24e-3
+    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d, wl, 0, save=True, I=I)
 
+    phi = 28.7 
+
+    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d, wl, phi, save=True, I=I)
+
+    phi = 77.3
+
+    plot_R_T_A_fixed_phi0_and_d(n0, n1, n2, d, wl, phi, save=True, I=I)
