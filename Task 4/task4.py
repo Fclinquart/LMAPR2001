@@ -70,7 +70,6 @@ def reflectivity_semi_infinite_layer(n0, n1, phi0):
         
     return R
 
-
 def plot_solar_spectrum(filename, filename_2=None, filename_3=None, save=False):
     """
     Plots the solar spectrum from a given file and optionally other spectra.
@@ -273,39 +272,48 @@ def plot_n_k(material_list, wl_interp, log=False):
     Returns:
         None
     """
-    fig, axs = plt.subplots(2, 1, figsize=(10, 12), sharex=True)
+    import plotly.graph_objects as go
 
-    colors = plt.cm.tab10(np.linspace(0, 1, len(material_list)))  # Generate distinct colors for each material
+    fig = go.Figure()
 
     for idx, material in enumerate(material_list):
         n, k = Extract_n_k(material, wl_interp)
         
+        # Add refractive index (n) trace
+        fig.add_trace(go.Scatter(
+            x=wl_interp,
+            y=n,
+            mode='lines',
+            name=f'{material} (n)',
+            line=dict(width=2)
+        ))
         
-        # Plot refractive index (n)
-        axs[0].plot(wl_interp, n, label='{}'.format(material), linewidth=2, color=colors[idx])
-        
-        # Plot extinction coefficient (k)
-        axs[1].plot(wl_interp, k, label='{}'.format(material), linewidth=2, color=colors[idx])
+        # Add extinction coefficient (k) trace
+        fig.add_trace(go.Scatter(
+            x=wl_interp,
+            y=k,
+            mode='lines',
+            name=f'{material} (k)',
+            line=dict(width=2, dash='dot')
+        ))
 
     if log:
-        axs[0].set_xscale('log')
-        axs[1].set_xscale('log')
-        axs[0].set_yscale('log')
-        
+        fig.update_xaxes(type='log')
+        fig.update_yaxes(type='log', title_text='Refractive Index (n) / Extinction Coefficient (k)')
+    else:
+        fig.update_yaxes(title_text='Refractive Index (n) / Extinction Coefficient (k)', secondary_y=False)
 
+    fig.update_xaxes(title_text='Wavelength (nm)')
+    fig.add_vrect(x0=8, x1=13, fillcolor="yellow", opacity=0.1, line_width=0)
 
-    axs[0].set_ylabel('Refractive Index (n)')
-    axs[1].set_ylabel('Extinction Coefficient (k)')
-    axs[1].set_xlabel('Wavelength (nm)')
+    fig.update_layout(
+        title='Refractive Index and Extinction Coefficient',
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        template='plotly_white'
+    )
 
-    axs[0].axvspan(8, 13, color='yellow', alpha=0.1)
-    axs[1].axvspan(8, 13, color='yellow', alpha=0.1)
-
-    axs[0].legend(loc='upper left', fontsize='small')
-    
-    plt.tight_layout()
-    plt.savefig('Output/Choice/refractive_index_and_extinction_coefficient.png', dpi=300)
-    plt.show()
+    fig.write_image('Output/Choice/refractive_index_and_extinction_coefficient_plotly.png')
+    fig.show()
 
 def plot_transmittance_semi_infinite_layer(material_list, wl):
     """
@@ -351,6 +359,7 @@ if __name__ == "__main__":
     n,k =Extract_n_k("SiO", wl)
     print("n: ", n)
     print("k: ", k)
+    plot_n_k(["Ag"], wl, log=True)
     
 
     material = [ "PMMA", "PC", "PDMS", "PVC","SiC", "SiO", "SiO2","Si3N4"]
@@ -367,6 +376,6 @@ if __name__ == "__main__":
 
     ]
 
-    task3.plot_R_T_A_fixed_phi0_and_d_multilayer(config,wl,True)
+    # task3.plot_R_T_A_fixed_phi0_and_d_multilayer(config,wl,True)
     
     
