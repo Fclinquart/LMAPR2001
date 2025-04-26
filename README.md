@@ -50,4 +50,12 @@ of the materials
     - [ ] Jeremy tu sais refaire les plots que le plot 2C) est pas cohérent. 
     - [x] make the Wiki more reable
 
+## Task 3
+- [ ] quid du FTIR
+- [ ] reverse engineering pas convainquante 
+- [ ] refaire la biblio
+## Task 4
+
+
+
 

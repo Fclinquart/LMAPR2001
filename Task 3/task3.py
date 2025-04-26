@@ -532,8 +532,8 @@ def explore_multilayer_performance(wl, num_bilayers=10):
     # Load solar spectrum
     I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt", wl)
     
-    zns_thicknesses = np.linspace(0.001, 1, 40)
-    aerogel_thicknesses = np.linspace(0.001, 1, 40)
+    zns_thicknesses = np.linspace(0.001, 0.1, 40)
+    aerogel_thicknesses = np.linspace(0.001, 0.1, 40)
 
     T_visible = np.zeros((len(zns_thicknesses), len(aerogel_thicknesses)))
     R_infrared = np.zeros((len(zns_thicknesses), len(aerogel_thicknesses)))
@@ -589,6 +589,88 @@ def explore_multilayer_performance(wl, num_bilayers=10):
     plt.tight_layout()
     plt.savefig("Output/Aerogel/ZnS_aerogel_TR_product.png")
     plt.show()
+
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # nécessaire pour les graphiques 3D
+
+def find_optimal_num_layers_3D(wl, aerogel_thicknesses, zns_thicknesses, max_layers=20, num_layers_to_plot=5):
+    """
+    Plot 3D surfaces of T_visible, R_infrared and TR_product
+    as a function of aerogel thickness and ZnS thickness
+    for a fixed number of bilayers.
+    """
+    print("Optimizing the thicknesses of the aerogel system")
+
+    # Charger le spectre solaire
+    I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt", wl)
+
+    # Initialiser les tableaux 3D
+    T_visible = np.zeros((len(aerogel_thicknesses), len(zns_thicknesses), max_layers))
+    R_infrared = np.zeros((len(aerogel_thicknesses), len(zns_thicknesses), max_layers))
+    TR_product = np.zeros((len(aerogel_thicknesses), len(zns_thicknesses), max_layers))
+
+    mask_visible = (wl >= 0.4) & (wl <= 0.7)
+    mask_infrared = (wl > 0.7)
+
+    # Calculs pour chaque configuration
+    for i, aerogel_th in enumerate(aerogel_thicknesses):
+        for j, zns_th in enumerate(zns_thicknesses):
+            for num_bilayers in range(1, max_layers + 1):
+                config = create_aerogel_dielectric_multilayer(num_bilayers, zns_th, aerogel_th)
+                optical_layers = layers(config, wl)
+                R, T, A = calculate_RTA_multilayer(optical_layers, wl, phi0=0)
+
+                T_vis = np.trapz(T[mask_visible] * I[mask_visible], wl[mask_visible])
+                R_ir = np.trapz(R[mask_infrared] * I[mask_infrared], wl[mask_infrared])
+
+                T_visible[i, j, num_bilayers - 1] = T_vis
+                R_infrared[i, j, num_bilayers - 1] = R_ir
+                TR_product[i, j, num_bilayers - 1] = T_vis * R_ir
+
+    # Extraction de la tranche pour le nombre de couches spécifié
+    layer_index = num_layers_to_plot - 1
+    T_vis_slice = T_visible[:, :, layer_index]
+    R_ir_slice = R_infrared[:, :, layer_index]
+    TR_slice = TR_product[:, :, layer_index]
+
+    # Grilles pour les axes
+    X, Y = np.meshgrid(aerogel_thicknesses, zns_thicknesses, indexing='ij')
+
+    # Création de la figure avec 3 sous-graphes
+    fig = plt.figure(figsize=(18, 6))
+
+    # Transmittance visible
+    ax1 = fig.add_subplot(131, projection='3d')
+    surf1 = ax1.plot_surface(X, Y, T_vis_slice, cmap='viridis', edgecolor='k', alpha=0.9)
+    ax1.set_title(f"Visible Transmittance\n{num_layers_to_plot} bilayers")
+    ax1.set_xlabel("Aerogel Thickness (µm)")
+    ax1.set_ylabel("ZnS Thickness (µm)")
+    ax1.set_zlabel("T_visible")
+    fig.colorbar(surf1, ax=ax1, shrink=0.5)
+
+    # Réflectivité infrarouge
+    ax2 = fig.add_subplot(132, projection='3d')
+    surf2 = ax2.plot_surface(X, Y, R_ir_slice, cmap='inferno', edgecolor='k', alpha=0.9)
+    ax2.set_title(f"Infrared Reflectivity\n{num_layers_to_plot} bilayers")
+    ax2.set_xlabel("Aerogel Thickness (µm)")
+    ax2.set_ylabel("ZnS Thickness (µm)")
+    ax2.set_zlabel("R_infrared")
+    fig.colorbar(surf2, ax=ax2, shrink=0.5)
+
+    # Produit T * R
+    ax3 = fig.add_subplot(133, projection='3d')
+    surf3 = ax3.plot_surface(X, Y, TR_slice, cmap='plasma', edgecolor='k', alpha=0.9)
+    ax3.set_title(f"TR Product\n{num_layers_to_plot} bilayers")
+    ax3.set_xlabel("Aerogel Thickness (µm)")
+    ax3.set_ylabel("ZnS Thickness (µm)")
+    ax3.set_zlabel("T_visible × R_infrared")
+    fig.colorbar(surf3, ax=ax3, shrink=0.5)
+
+    plt.tight_layout()
+    plt.savefig(f"Output/Aerogel/3D_TR_analysis_{num_layers_to_plot}_layers.png", dpi=300)
+    plt.show()
+
 
 
 def Psi_Delta_theory(config, wl, phi0):
@@ -811,17 +893,39 @@ def pourcentage(config, wl, Irradiance, phi0=0):
     
     return R_percentage, T_percentage, A_percentage
 
+def power_per_spectrum(Irradiance, wl):
+    """
+    Calculate the power per spectrum for a given wavelength range and solar irradiance.
+    
+    Parameters:
+    wl : array-like
+        Wavelengths in micrometers.
+    Irradiance : array-like
+        Solar irradiance data corresponding to wavelengths.
+    
+    Returns:
+    float : Power per spectrum in Joules.
+    """
+    # Calculate power per spectrum
+    power_UV = np.trapz(Irradiance[(wl >= 0.2) & (wl <= 0.4)], wl[(wl >= 0.2) & (wl <= 0.4)])
+    power_visible = np.trapz(Irradiance[(wl >= 0.4) & (wl <= 0.7)], wl[(wl >= 0.4) & (wl <= 0.7)])
+    power_IR = np.trapz(Irradiance[(wl > 0.7)], wl[(wl > 0.7)])
+    return power_UV, power_visible, power_IR
+
 
 if __name__ == "__main__":
 
     wl = np.linspace(0.2, 20, 1000)
     I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt", wl)
     
-    
+    P_UV, P_visible, P_IR = power_per_spectrum(I, wl)
+    print(f"Power in UV: {P_UV:.2f} J")
+    print(f"Power in Visible: {P_visible:.2f} J")
+    print(f"Power in IR: {P_IR:.2f} J")
     
 
     power_saving_information= False
-    aerogel = False
+    aerogel = True
     optim_d = False
     ZnS_info = False
     Cu_info = False
@@ -830,7 +934,19 @@ if __name__ == "__main__":
     Ag_dielec = False
     comparaison_multi = False
     plot_ten_layer = False
-    ellipsometry = True
+    ellipsometry = False
+    power_spect = False
+
+    if power_spect:
+        power_UV, power_visible, power_IR = power_per_spectrum(I, wl)
+        print(f"Power in UV: {power_UV:.2f} J")
+        print(f"Power in Visible: {power_visible:.2f} J")
+        print(f"Power in IR: {power_IR:.2f} J")
+        print(f"Total Power: {power_UV + power_visible + power_IR:.2f} J")
+
+
+
+
     if ellipsometry:
         Psi, Delta, Psi65, Delta65 = extract_experimental_ellipsometry()
 
@@ -1177,7 +1293,10 @@ if __name__ == "__main__":
     if aerogel:
         print("Optimizing the thicknesses of the aerogel system")
         wl = np.linspace(0.2, 20, 1000)
-        explore_multilayer_performance(wl, num_bilayers=10)
+        d = np.linspace(0.001, 0.1, 20)
+        # find_optimal_num_layers_3D(wl, d, d, max_layers=20, num_layers_to_plot=20)
+
+
     
     
     if comparaison_multi:  # Add a condition here if needed

@@ -39,6 +39,9 @@ def layers(config, wl_interp, debug=False):
     "SiC": "Data/SiC.txt",
     "Si3N4":"Data/Si3N4.txt",
     "In":"Data/In.txt",
+    "Si":"Data/Si.txt",
+    "Si-InP":"Data/Si-InP.txt",
+    "Ta2O5":"Data/ta5O5.txt",
 
     }
     
@@ -162,7 +165,7 @@ def calculate_RTA_multilayer(layers, wl, phi0=0, ellipsometry=False):
 
     return R, T, A
 
-def objective_function(thicknesses, layers_config, wl, Irradiance, phi0=0, Spectrum_UV_IR = False):
+def objective_function(thicknesses, layers_config, wl, Irradiance, phi0=0, Spectrum_UV_IR = False, Radiative = False):
     """Fonction objectif pour l'optimisation avec irradiance."""
     # Mise à jour des épaisseurs
     updated_config = []
@@ -185,20 +188,30 @@ def objective_function(thicknesses, layers_config, wl, Irradiance, phi0=0, Spect
     mask_T = (wl >= 0.4) & (wl <= 0.7)
     if Spectrum_UV_IR : 
         mask_R = ~mask_T
+        A_integrated = 1
+    elif Radiative:
+        mask_R = (wl > 0.2) & (wl <= 8)
+        mask_A = (wl > 8) & (wl <= 13)
+        A_integrated = np.trapz(A[mask_A] * Irradiance[mask_A], wl[mask_A])
     else :
         mask_R = (wl > 0.7) & (wl <= 20)
+        A_integrated = 1
+
     
     # Intégration pondérée par l'irradiance
     T_integrated = np.trapz(T[mask_T] * Irradiance[mask_T], wl[mask_T])
     R_integrated = np.trapz(R[mask_R] * Irradiance[mask_R], wl[mask_R])
     
+    
     # Score à minimiser (on veut maximiser T dans le visible et R ailleurs)
-    score = 1/(T_integrated * R_integrated + 1e-10)  # +1e-10 pour éviter division par zéro
+    score = 1/(T_integrated * R_integrated * A_integrated + 1e-10)  # +1e-10 pour éviter division par zéro
+    if Radiative:
+        score = 1/(T_integrated * A_integrated * R_integrated + 1e-10)
     
     
     return score
 
-def optimize_layer_thicknesses(layers_config, wl, Irradiance, phi0=0, bounds=None, Spectrum_UV_IR = False):
+def optimize_layer_thicknesses(layers_config, wl, Irradiance, phi0=0, bounds=None, Spectrum_UV_IR = False, Radiative = False):
     """
     Optimise les épaisseurs en tenant compte de l'irradiance solaire.
     """
@@ -218,7 +231,7 @@ def optimize_layer_thicknesses(layers_config, wl, Irradiance, phi0=0, bounds=Non
     result = minimize(
         objective_function,
         initial_thicknesses,
-        args=(layers_config, wl, Irradiance, phi0),
+        args=(layers_config, wl, Irradiance, phi0, Spectrum_UV_IR, Radiative),
         bounds=bounds,
         method='L-BFGS-B',
         options={'maxiter': 100, 'disp': True}
@@ -260,9 +273,9 @@ def plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, Irradiance = False, phi0=
     fig, ax1 = plt.subplots(figsize=(12, 6))
     
     # Plot RTA on primary y-axis
-    ax1.plot(wl, R, 'r-', label="Reflectivity", linewidth=2)
-    ax1.plot(wl, T, 'g-', label="Transmissivity", linewidth=2)
-    ax1.plot(wl, A, 'b-', label="Absorbance", linewidth=2)
+    ax1.plot(wl, R, 'r-', label="Reflectivity", linewidth=0.75)
+    ax1.plot(wl, T, 'g-', label="Transmissivity")
+    ax1.plot(wl, A, 'b-', label="Absorbance")
     ax1.set_xlabel("Wavelength (µm)")
     ax1.set_ylabel("R, T, A")
     ax1.set_xscale('log')
@@ -277,9 +290,9 @@ def plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, Irradiance = False, phi0=
         ax2.tick_params('y', colors='k')
     
     # Add spectral regions
-    ax1.axvspan(0.38, 0.8, color="yellow", alpha=0.05, label="Visible")
-    ax1.axvspan(0.2, 0.38, color="purple", alpha=0.05, label="UV")
-    ax1.axvspan(0.8, 20, color="red", alpha=0.05, label="IR")
+    ax1.axvspan(wl[0], 0.7, color="yellow", alpha=0.05, label="Visible")
+    ax1.axvspan(0.2, 0.4, color="purple", alpha=0.05, label="UV")
+    ax1.axvspan(0.7, wl[-1], color="red", alpha=0.05, label="IR")
     
     # Add a legend for the system configuration
      # Add a legend for the system configuration
@@ -316,7 +329,7 @@ def plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, Irradiance = False, phi0=
     
     plt.tight_layout()
     if save:
-        plt.savefig(f"Output/RTA_phi0_d/{title}.png")
+        plt.savefig(f"Output/{title}_{config[1][0]}_{config[2][0]}_{config[3][0]}.png")
     else:
         plt.show()
         

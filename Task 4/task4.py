@@ -6,6 +6,12 @@ import os
 import scipy.optimize as opt
 from scipy.optimize import minimize
 import task3 # type: ignore
+import string
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
+from matplotlib.ticker import (MultipleLocator, 
+                               FormatStrFormatter, 
+                               AutoMinorLocator)
 
 def snells(n0, n1, phi0):
     """
@@ -148,6 +154,9 @@ def Extract_n_k(material, wl_interp):
         "SiC": "Data/SiC.txt",
         "Si3N4":"Data/Si3N4.txt",
         "In":"Data/In.txt",
+        "Si":"Data/Si.txt",
+        "Si-InP":"Data/Si-InP.txt",
+        "Ta2O5":"Data/ta5O5.txt",
 
     }
 
@@ -272,110 +281,292 @@ def plot_n_k(material_list, wl_interp, log=False):
     Returns:
         None
     """
-    import plotly.graph_objects as go
-
-    fig = go.Figure()
-
-    for idx, material in enumerate(material_list):
-        n, k = Extract_n_k(material, wl_interp)
-        
-        # Add refractive index (n) trace
-        fig.add_trace(go.Scatter(
-            x=wl_interp,
-            y=n,
-            mode='lines',
-            name=f'{material} (n)',
-            line=dict(width=2)
-        ))
-        
-        # Add extinction coefficient (k) trace
-        fig.add_trace(go.Scatter(
-            x=wl_interp,
-            y=k,
-            mode='lines',
-            name=f'{material} (k)',
-            line=dict(width=2, dash='dot')
-        ))
-
-    if log:
-        fig.update_xaxes(type='log')
-        fig.update_yaxes(type='log', title_text='Refractive Index (n) / Extinction Coefficient (k)')
-    else:
-        fig.update_yaxes(title_text='Refractive Index (n) / Extinction Coefficient (k)', secondary_y=False)
-
-    fig.update_xaxes(title_text='Wavelength (nm)')
-    fig.add_vrect(x0=8, x1=13, fillcolor="yellow", opacity=0.1, line_width=0)
-
-    fig.update_layout(
-        title='Refractive Index and Extinction Coefficient',
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        template='plotly_white'
-    )
-
-    fig.write_image('Output/Choice/refractive_index_and_extinction_coefficient_plotly.png')
-    fig.show()
-
-def plot_transmittance_semi_infinite_layer(material_list, wl):
-    """
-    Plot the transmittance of a semi-infinite layer for a list of materials.
-
-    Parameters:
-        material_list (list): List of strings containing material names.
-        wl (numpy.ndarray): Wavelengths in nm.
-
-    Returns:
-        None
-    """
-    plt.figure(figsize=(10, 6))
-    colors = plt.cm.tab10(np.linspace(0, 1, len(material_list)))  # Generate distinct colors for each material
-
-    for idx, material in enumerate(material_list):
-        n, k = Extract_n_k(material, wl)
-        n_air = calculate_refractive_index_air(wl)
-        phi0 = 0  # Normal incidence
-        R = reflectivity_semi_infinite_layer(n_air, n + 1j * k, phi0)
-        T = 1 - R  # Transmittance is 1 - Reflectance
-        plt.plot(wl, T, label=material, linewidth=2, color=colors[idx])
-
-    plt.xlabel('Wavelength (nm)')
-    plt.ylabel('Transmittance')
-    plt.axvspan(8, 13, color='yellow', alpha=0.1)
-    plt.xscale("log")
-    plt.title('Transmittance of Semi-Infinite Layers')
-    plt.legend(loc='upper right', fontsize='small')
     
+    # 2  subplots for all materials, one for n and one for k
+
+    fig, axs = plt.subplots(3, 1, sharex=True, figsize=(10, 20))
+    
+    # use a different marker for each material, markerface color = 'white', line color = 'black', line width = 0.7, sans serif, fontsize = 10, no title
+    markers = ['o', 's', 'D', '^', 'v', 'x', '+', '*', 'P', 'H']
+    colors = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+    for i, material in enumerate(material_list):
+        n, k = Extract_n_k(material, wl_interp)
+        R, T, A = task3.calculate_RTA_multilayer(task3.layers([(material, 1)], wl_interp), wl_interp, 0, False)
+        
+        if log:
+            axs[0].plot(wl_interp, n, label=material, marker=markers[i % len(markers)], markerfacecolor='white', color=colors[i % len(colors)], linewidth=0.7, markersize=8, markevery=(np.logspace(0, np.log10(len(wl_interp)), num=50, dtype=int) - 1), markeredgecolor=colors[i % len(colors)])
+            axs[1].plot(wl_interp, k, label=material, marker=markers[i % len(markers)], markerfacecolor='white', color=colors[i % len(colors)], linewidth=0.7, markersize=8, markevery=(np.logspace(0, np.log10(len(wl_interp)), num=50, dtype=int) - 1), markeredgecolor=colors[i % len(colors)])
+            axs[2].plot(wl_interp, A, label=material, marker=markers[i % len(markers)], markerfacecolor='white', color=colors[i % len(colors)], linewidth=0.7, markersize=8, markevery=(np.logspace(0, np.log10(len(wl_interp)), num=50, dtype=int) - 1), markeredgecolor=colors[i % len(colors)])
+        else:
+            axs[0].plot(wl_interp, n, label=material)
+            axs[1].plot(wl_interp, k, label=material)
+            axs[2].plot(wl_interp, A, label=material)
+
+    # Add zoom-in inset on the third subplot
+    axins = inset_axes(axs[2], width="20%", height="50%", loc='upper right', borderpad=0)
+   
+    axins.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    x1, x2 = 8, 13  # Define the x-axis range for the zoom
+    y1, y2 = 0.4, 1  # Define the y-axis range for the zoom
+    axins.set_xlim(x1, x2)
+    axins.set_ylim(y1, y2)
+    for i, material in enumerate(material_list):
+        _, _, A = task3.calculate_RTA_multilayer(task3.layers([(material, 1)], wl_interp), wl_interp, 0, False)
+        axins.plot(wl_interp, A, label=material, marker=markers[i % len(markers)], markerfacecolor='white', color=colors[i % len(colors)], linewidth=0.7, markersize=8, markevery=(np.logspace(0, np.log10(len(wl_interp)), num=50, dtype=int) - 1), markeredgecolor=colors[i % len(colors)])
+    mark_inset(axs[2], axins, loc1=2, loc2=1, fc="None", ec="red", lw=2)
+
+    axs[0].set_ylabel('Refractive Index (n)')
+    axs[1].set_ylabel('Extinction Coefficient (k)')
+    axs[2].set_ylabel('Absorbance (A)')
+    axs[2].set_xlabel('Wavelength (µm)')
+    
+    
+    # Highlight the area between 8 and 13 µm
+    for n, ax in enumerate(axs):
+        ax.axvspan(8, 13, color='blue', alpha=0.05, label='Transparancy Window of the sun')
+        ax.text(0.05, 0.9, string.ascii_uppercase[n], transform=ax.transAxes, 
+            size=20, weight='bold')
+    
+    # Add a single legend for all subplots behind the plots
+   
+    axs[2].legend(loc='upper center', bbox_to_anchor=(0.5, -0.3),
+          fancybox=True, shadow=True, ncol=5, fontsize=10)
+    
+    if log:
+        axs[0].set_xscale('log')
+        axs[1].set_xscale('log')
+        axs[0].set_yscale('log')
+        axs[1].set_yscale('log')
+        axs[2].set_xscale('log')
+        axs[1].set_ylim(10e-2,10)
+        axs[2].set_ylim(0,1)
     plt.tight_layout()
-    plt.savefig('Output/Choice/transmittance_semi_infinite_layer.png', dpi=300)
+    plt.savefig('Output/Choice/n_k_plot.png', dpi=300, bbox_inches='tight')
     plt.show()
 
+   
+def generate_config(material_list, wl_interp):
+    config = []
+    config.append(("air", 0))
+    for i, material in enumerate(material_list):
+        config.append((material_list[i],0.1))
+    config.append(("glass",1))
+
+    I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt",wl_interp)
+    print(config)
+    d_1, d_2, _ = task3.optimize_layer_thicknesses(config, wl_interp, I, 0, Radiative=True)
+
+    config[1] = (config[1][0], d_1)
+    config[2] = (config[2][0], d_2)
+    config[3] = (config[3][0], d_1)
+    return config
+       
+def plot_R_T_A_fixed_phi0_and_d_multilayer_6configs(configs, wl, Irradiance=False, phi0=0, titles=None, save=False):
+    """
+    Plots R, T, A for 6 multilayer configs using subplots.
+
+    Parameters:
+    -----------
+    configs : list of list of tuples
+        List of 6 configurations (each is a list of (material, thickness) tuples).
+    wl : array-like
+        Wavelengths (µm).
+    Irradiance : array-like or False
+        Solar spectrum data or False to ignore.
+    phi0 : float
+        Angle of incidence in degrees.
+    titles : list of str or None
+        Titles for each subplot.
+    save : bool
+        Whether to save the figure.
+
+    """
+    if titles is None:
+        titles = [f"Config {i+1}" for i in range(len(configs))]
+
+    fig, axs = plt.subplots(2, 3, figsize=(18, 10), sharex=True, sharey=True)
+    axs = axs.ravel()
+
+    if Irradiance is not False:
+        wl_sol, Irradiance = Extraction.extract_solar_irrandiance("Data/ASTM1.5Global.txt", plot=False)
+
+    for idx, config in enumerate(configs):
+        ax1 = axs[idx]
+        l = task3.layers(config, wl)
+        R, T, A = task3.calculate_RTA_multilayer(l, wl, phi0)
+
+        # R, T, A
+        ax1.plot(wl, R, 'r-', label="R", linewidth=0.75)
+        ax1.plot(wl, T, 'g-', label="T")
+        ax1.plot(wl, A, 'b-', label="A")
+
+        # Visible, UV, IR bands
+        ax1.axvspan(wl[0], 0.7, color="yellow", alpha=0.05)
+        ax1.axvspan(0.2, 0.4, color="purple", alpha=0.05)
+        ax1.axvspan(0.7, 8, color="red", alpha=0.05)
+        ax1.axvspan(13, wl[-1], color="red", alpha=0.05)
+        ax1.axvspan(8, 13, color="blue", alpha=0.05)
+
+        # Labeling
+        ax1.set_xscale('log')
+        ax1.set_title(titles[idx], fontsize=12)
+        ax1.set_xlabel("λ (µm)")
+        ax1.set_ylabel("R, T, A")
+        ax1.set_ylim(0, 1)  # Limit y-axis between 0 and 1
+
+       
+
+        # Solar Irradiance (secondary y-axis)
+        if Irradiance is not False:
+            ax2 = ax1.twinx()
+            ax2.plot(wl_sol, Irradiance, 'k--', alpha=0.3, label="Solar Irradiance")
+            ax2.set_ylabel("Irradiance", color='k')
+            ax2.tick_params('y', colors='k')
+
+    # Global legend (first axis only)
+    handles, labels = axs[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", ncol=3, fontsize=12)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+    if save:
+        plt.savefig("Output/multilayer_RTA6_{}.png".format(config[1][0]), dpi=300)
+    else:
+        plt.show()
+
+# P=2S∫∞0IλB(T)2π∫π/20ϵλ(θ)cosθsinθdθdϕdλ
+
+
+from scipy.constants import h, c, k
+from scipy.integrate import simps
+
+def radiated_power(T, wl, config, phi0=0, Atmosphere=False):
+    """
+    Compute radiated power per square meter of a multilayer system at temperature T.
+
+    Parameters:
+        T (float): Temperature in Kelvin.
+        wl (numpy.ndarray): Wavelengths in micrometers.
+        config (list): List of tuples (material, thickness) for each layer.
+        phi0 (float): Angle of incidence in degrees (used in RTA computation).
+        Atmosphere (bool): If True, apply atmospheric transparency window mask.
+
+    Returns:
+        P (float): Radiated power in W/m².
+    """
+    # Apply atmospheric transparency window mask if Atmosphere is True
+    if Atmosphere:
+        mask = (wl > 8) & (wl < 13)
+        wl = wl[mask]
+    wl_m = wl * 1e-6  # Convert wavelength to meters for Planck's law
+
+    # Planck spectral radiance (per wavelength), unpolarized
+    I_lambda = (2 * h * c**2) / (wl_m**5 * (np.exp(h * c / (wl_m * k * T)) - 1))  # in W·m⁻²·nm⁻¹·sr⁻¹
+
+    # Compute directional emissivity ε = 1 - R - T at each wavelength
+    layers = task3.layers(config, wl)
+    R, T_, A = task3.calculate_RTA_multilayer(layers, wl, phi0=phi0)
     
-    
-    
+
+    # Angular integration factor for hemispheric emission (∫cosθ sinθ dθ dφ from 0 to π = π)
+    angular_factor = np.pi
+
+    # Spectral power per unit area (W/m²·µm)
+    spectral_power = A * I_lambda * angular_factor  # W·m⁻²·nm⁻¹
+
+    # Integrate over wavelength (in µm)
+    P = simps(spectral_power, wl_m)  # Result in W/m²
+
+    return P
+
+def power_save(config,wl,I, phi= 0):
+    R, T, A = task3.calculate_RTA_multilayer(task3.layers(config, wl), wl, phi)
+    return np.trapz(I * R, wl)  # Integrate over wavelength
+
+
+def temperature_change(T_init_array, P_net, mass, cp, time_hours):
+    """
+    Compute temperature change after a given cooling time for an array of initial temperatures.
+
+    Parameters:
+        T_init_array (array-like): Array of initial temperatures in Kelvin.
+        P_net (float): Net radiative power per m² (positive if losing energy), in W/m².
+        mass (float): Mass of the system in kg.
+        cp (float): Heat capacity in J/kg/K.
+        time_hours (float): Total time of cooling in hours.
+
+    Returns:
+        delta_T_array (numpy.ndarray): Array of temperature changes in Kelvin.
+    """
+    T_init_array = np.array(T_init_array)  # Ensure input is an array
+    time_seconds = time_hours * 3600       # Convert hours to seconds
+    delta_T = -(P_net * time_seconds) / (mass * cp)  # Scalar ΔT for given P_net
+
+    # Create an array of the same shape as T_init_array
+    delta_T_array = np.full_like(T_init_array, delta_T)
+
+    return delta_T_array
 
 
 if __name__ == "__main__":
     wl = np.linspace(0.2, 50, 10000)
     I = Extraction.solar_interpolation("Data/ASTM1.5Global.txt",wl)
-    n,k =Extract_n_k("SiO", wl)
-    print("n: ", n)
-    print("k: ", k)
-    plot_n_k(["Ag"], wl, log=True)
+   
+    
     
 
-    material = [ "PMMA", "PC", "PDMS", "PVC","SiC", "SiO", "SiO2","Si3N4"]
-    
-    config =[
-        ('air',0),
-       
-        ('PVC',0.025),
-        ('SiO',0.025),
-        ('In',0.001),
-        ('PVC',0.025),
-        ('SiO',0.025),
-        ("glass",0.025)
+    material = [ "PMMA", "PC", "PDMS", "PVC","SiC", "SiO", "SiO2","Si3N4", "Ta2O5"]
+#     #TiO2
+# ZnO
+# ZnS
+# poly(methylmethacrylate)
+# poly(etherimide)
+# poly(carbonate)
+   
+   
+   
+    config3 = generate_config(["TiO2", "PDMS","TiO2"], wl)
+   
 
-    ]
+   
 
-    # task3.plot_R_T_A_fixed_phi0_and_d_multilayer(config,wl,True)
+    T =[300,310,320,330,340,350]
+    T = np.array(T)
+    for i in T:
+        P = radiated_power(i, wl, config3, phi0=0, Atmosphere=True)
+        print("Radiated power for config3: ", P)
+
+    P = [51.08770967063887, 59.910041989515186, 69.60168029225552, 80.17390195902188, 91.63380598982508, 103.98469298157967]
+    P = np.array(P)
+    mass = 1  # kg
+    cp = 840e3    # J/kg/K
+    time_hours = 8
+
+    delta_T_array = temperature_change(T, P, mass, cp, time_hours)
+    print("Temperature change: ", delta_T_array)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(T-273.15, P, label='Radiated Power', color='black', marker='o', markersize=8, markerfacecolor='white', markeredgecolor='black', linewidth=0.7)
+    ax.set_xlabel('Temperature (°C)', fontsize=10)
+    ax.set_ylabel('Radiated Power (W/m²)', fontsize=10)
+
+    ax2 = ax.twinx()
+    ax2.plot(T-273.15, -delta_T_array, label='$\Delta T$', color='black', marker='D', markersize=8, markerfacecolor='white', markeredgecolor='red', linewidth=0.7)
+    ax2.set_ylabel('Temperature Change $\Delta T$ (°C)', fontsize=10)
+    ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.0f}'.format(x))) 
+    ax2.yaxis.set_major_locator(MultipleLocator(1))
+
+    fig.legend(loc='lower right', fontsize=10, frameon=False)
     
+    
+    fig.tight_layout()
+    plt.savefig('Output/Black_Body/radiated_power_vs_temperature_change.png', dpi=300)
+
+
+    
+   
+    
+   
+    
+
     
