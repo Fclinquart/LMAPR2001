@@ -526,41 +526,43 @@ if __name__ == "__main__":
    
    
     config3 = generate_config(["TiO2", "PDMS","TiO2"], wl)
+
+    task3.plot_R_T_A_fixed_phi0_and_d_multilayer(config3, wl, True, phi0=0, save=False)
    
 
    
 
-    T =[300,310,320,330,340,350]
-    T = np.array(T)
-    for i in T:
-        P = radiated_power(i, wl, config3, phi0=0, Atmosphere=True)
-        print("Radiated power for config3: ", P)
+    # T =[300,310,320,330,340,350]
+    # T = np.array(T)
+    # for i in T:
+    #     P = radiated_power(i, wl, config3, phi0=0, Atmosphere=True)
+    #     print("Radiated power for config3: ", P)
 
-    P = [51.08770967063887, 59.910041989515186, 69.60168029225552, 80.17390195902188, 91.63380598982508, 103.98469298157967]
-    P = np.array(P)
-    mass = 1  # kg
-    cp = 840e3    # J/kg/K
-    time_hours = 8
+    # P = [51.08770967063887, 59.910041989515186, 69.60168029225552, 80.17390195902188, 91.63380598982508, 103.98469298157967]
+    # P = np.array(P)
+    # mass = 1  # kg
+    # cp = 840e3    # J/kg/K
+    # time_hours = 8
 
-    delta_T_array = temperature_change(T, P, mass, cp, time_hours)
-    print("Temperature change: ", delta_T_array)
+    # delta_T_array = temperature_change(T, P, mass, cp, time_hours)
+    # print("Temperature change: ", delta_T_array)
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(T-273.15, P, label='Radiated Power', color='black', marker='o', markersize=8, markerfacecolor='white', markeredgecolor='black', linewidth=0.7)
-    ax.set_xlabel('Temperature (°C)', fontsize=10)
-    ax.set_ylabel('Radiated Power (W/m²)', fontsize=10)
+    # fig, ax = plt.subplots(figsize=(10, 6))
+    # ax.plot(T-273.15, P, label='Radiated Power', color='black', marker='o', markersize=8, markerfacecolor='white', markeredgecolor='black', linewidth=0.7)
+    # ax.set_xlabel('Temperature (°C)', fontsize=10)
+    # ax.set_ylabel('Radiated Power (W/m²)', fontsize=10)
 
-    ax2 = ax.twinx()
-    ax2.plot(T-273.15, -delta_T_array, label='$\Delta T$', color='black', marker='D', markersize=8, markerfacecolor='white', markeredgecolor='red', linewidth=0.7)
-    ax2.set_ylabel('Temperature Change $\Delta T$ (°C)', fontsize=10)
-    ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.0f}'.format(x))) 
-    ax2.yaxis.set_major_locator(MultipleLocator(1))
+    # ax2 = ax.twinx()
+    # ax2.plot(T-273.15, -delta_T_array, label='$\Delta T$', color='black', marker='D', markersize=8, markerfacecolor='white', markeredgecolor='red', linewidth=0.7)
+    # ax2.set_ylabel('Temperature Change $\Delta T$ (°C)', fontsize=10)
+    # ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: '{:.0f}'.format(x))) 
+    # ax2.yaxis.set_major_locator(MultipleLocator(1))
 
-    fig.legend(loc='lower right', fontsize=10, frameon=False)
+    # fig.legend(loc='lower right', fontsize=10, frameon=False)
     
     
-    fig.tight_layout()
-    plt.savefig('Output/Black_Body/radiated_power_vs_temperature_change.png', dpi=300)
+    # fig.tight_layout()
+    # plt.savefig('Output/Black_Body/radiated_power_vs_temperature_change.png', dpi=300)
 
 
     

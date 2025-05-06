@@ -290,9 +290,11 @@ def plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, Irradiance = False, phi0=
         ax2.tick_params('y', colors='k')
     
     # Add spectral regions
-    ax1.axvspan(wl[0], 0.7, color="yellow", alpha=0.05, label="Visible")
-    ax1.axvspan(0.2, 0.4, color="purple", alpha=0.05, label="UV")
-    ax1.axvspan(0.7, wl[-1], color="red", alpha=0.05, label="IR")
+    ax1.axvspan(wl[0], 0.7, color="yellow", alpha=0.05)
+    ax1.axvspan(0.2, 0.4, color="purple", alpha=0.05)
+    ax1.axvspan(0.7, 8, color="red", alpha=0.05)
+    ax1.axvspan(8, 13, color="blue", alpha=0.05)
+    ax1.axvspan(13, wl[-1], color="red", alpha=0.05)
     
     # Add a legend for the system configuration
      # Add a legend for the system configuration
@@ -322,7 +324,7 @@ def plot_R_T_A_fixed_phi0_and_d_multilayer(config, wl, Irradiance = False, phi0=
         lines2, labels2 = ax2.get_legend_handles_labels()
     else:
         lines2, labels2 = [], []
-    ax1.legend(lines1 + lines2, labels1 + labels2, fontsize=10)
+    ax1.legend(lines1 + lines2, labels1 + labels2, fontsize=8, loc='lower right')
     
     if title:
         ax1.set_title(title)

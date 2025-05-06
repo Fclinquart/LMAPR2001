@@ -58,4 +58,29 @@ of the materials
 
 
 
+# Final rush 
+
+## Module 3
+- Jeremy 
+    - [ ] Refaire le simaPro 
+    - [ ] Justifier Et Rediger 
+    - [ ] BibteX
+    - orienter la conclusion pour repondre à la question 
+- François
+    - [ ] Template LateX 
+
+
+# Module 4 
+- Merlin 
+    - [ ] montage 
+# Modle 5 
+- Merlin 
+    - [ ] ad initio : 3 epslon en fct du mesh 
+- jeremy 
+    - [ ]task 2 : discusion 
+- François 
+    - [ ]task 3 : fin 
+    - [ ] introdcution solar control glazing 
+
+
 
